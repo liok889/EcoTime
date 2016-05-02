@@ -35,8 +35,8 @@ function drawTimeAxis(group, startDate, endDate, width)
 			.scale(globalTimeScale)
 			.orient('top')
 			//.ticks(d3.time.days, 1)
-			.tickFormat(d3.time.format('%m/%d %H:%M'))
-			.tickSize(2)
+			.tickFormat(d3.time.format('%m/%d'))
+			//.tickSize(2)
 			//.tickPadding(20);
 
 		timeAxis = group.append('g')
@@ -227,10 +227,12 @@ function TimeseriesPlot(svg, parentSVG, w, h, brushCallback, offset)
 
 	(function(thisPlot, resizeRect) 
 	{
-		resizeRect.on("mousedown", function() {
+		resizeRect.on("mousedown", function() 
+		{
+			thisPlot.resizing = true;
 			thisPlot.mouseDown = d3.mouse(thisPlot.decorationGroup.node());
-			d3.select(document).on("mousemove.resizeRect", function() 
-			{
+			d3.select(document).on("mousemove.resizeRect", function() {
+
 				var mouse = d3.mouse(thisPlot.decorationGroup.node());
 				var dMouse = [mouse[0]-thisPlot.mouseDown[0], mouse[1]-thisPlot.mouseDown[1]];
 				thisPlot.mouseDown = mouse;
@@ -253,9 +255,10 @@ function TimeseriesPlot(svg, parentSVG, w, h, brushCallback, offset)
 						thisPlot.yScale.range([thisPlot.h-PLOT_PAD_H*2, 0])
 					}
 				}
-
+				d3.event.stopPropagation();
 			})
 			.on("mouseup.resizeRect", function() {
+				thisPlot.resizing = undefined;
 				d3.select(document)
 					.on("mousemove.resizeRect", null)
 					.on("mouseup.resizeRect", null);
@@ -267,7 +270,7 @@ function TimeseriesPlot(svg, parentSVG, w, h, brushCallback, offset)
 	{
 		group.on("mousemove", function() 
 		{
-			if (thisPlot.brushCallback && thisPlot.timeseries) {
+			if (thisPlot.brushCallback && thisPlot.timeseries && !thisPlot.resizing) {
 				var mouseX = d3.mouse(this)[0];
 				if (mouseX >= PLOT_PAD_W && mouseX <= thisPlot.w-PLOT_PAD_W) 
 				{
@@ -475,6 +478,17 @@ TimeseriesPlot.prototype.brushIndex = function(brushedIndex)
 	}
 }
 
+TimeseriesPlot.prototype.getSeriesLength = function()
+{
+	if (this.timeseries) {
+		return this.timeseries.getSeries().length;
+	}
+	else
+	{
+		return null;
+	}
+}
+
 TimeseriesPlot.prototype.plotLineGraph = function(timeseries, name)
 {
 	this.timeseries = timeseries;
@@ -609,18 +623,22 @@ function zoomAll()
 	}
 
 	var xDomain = globalXScale.domain();
-	/*
-	var xDiff = xDomain[1]-xDomain[0];
-	var tDiff = tDomain[1].getTime() - tDomain[0].getTime();
-	*/
 	var transfer = d3.scale.linear()
 		.domain(globalXDomain)
 		.range([tDomain[0].getTime(), tDomain[1].getTime()]);
 	
 	var newTimeDomain = [new Date(transfer(xDomain[0])), new Date(transfer(xDomain[1]))];
-
 	globalTimeScale.domain(newTimeDomain);
+	var days = (newTimeDomain[1].getTime() - newTimeDomain[0].getTime()) / (24*60*60*1000);
+	if (days <= 7) {
+		globalXAxis.tickFormat(d3.time.format('%m/%d %H:%M'));
+	}
+	else
+	{
+		globalXAxis.tickFormat(d3.time.format('%m/%d'));
+	}
 	timeAxis.call(globalXAxis);
+
 }
 
 function slideYControlWidget(delta)
