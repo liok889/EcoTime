@@ -56,8 +56,10 @@
 			fill: none;
 		}
 		.distRect {
-			fill: #444444;
+			fill: #999999;
 			stroke: none;
+			shape-rendering: crispEdges;
+
 		}
 		.brushCircle {
 			fill: red;
@@ -76,10 +78,22 @@
 			font-family: Helvetica;
 			font-size: 10pt;
 		}
+
+		.controlButton {
+			font-family: Helvetica;
+			font-size: 9pt;
+			font-weight: bold;
+			background-color: #dddddd;
+		}
 	</style>
 </head>
 
 <body>
+	<div>
+		<button class="controlButton" onclick="addView()">+</button>&nbsp;
+		<button class="controlButton" onclick="removeView()">-</button>
+	</div>
+
 	<svg id="svgMain" width="950" height="800" style="border: solid 0px #cccccc">
 		<defs></defs>
 	</svg>
@@ -175,46 +189,91 @@
 			// create space for scale
 			timeAxisGroup = svg.append("g").attr("transform", "translate(" + PLOT_X_OFFSET + ",35)");
 			drawTimeAxis(timeAxisGroup, ts.getStartDate(), ts.getEndDate(), PLOT_W);
+			createViews();
+		}
 
+		function createViews()
+		{
+			var prevH = 0;
 			for (var i=0; i<PLOT_COUNT; i++) 
 			{
 				var xOffset = PLOT_X_OFFSET;
-				var yOffset = 40+PLOT_Y_OFFSET + i*(PLOT_H+PLOT_Y_OFFSET);
+				var yOffset = 40+PLOT_Y_OFFSET + i*PLOT_Y_OFFSET + prevH;
 
-				var group = svg.append("g")
-					.attr("id", "plotGroup" + i)
-					.attr("transform", "translate(" + xOffset + "," + yOffset + ")");
-				var plot = new TimeseriesPlot(group, svg, PLOT_W, PLOT_H, plotBrushCallback, [xOffset, yOffset]);
-				plot.setResizeCallback(resizeCallback);
+				var plot = plots[i];
+				if (!plot) {
+					
+					var group = svg.append("g")
+						.attr("id", "plotGroup" + i)
+						.attr("transform", "translate(" + xOffset + "," + yOffset + ")");
+					plot = new TimeseriesPlot(group, svg, PLOT_W, PLOT_H, plotBrushCallback, [xOffset, yOffset]);
+					plot.setResizeCallback(resizeCallback);
 
-				// keep track of plots
-				plots.push(plot);
+					// keep track of plots
+					plots[i] = plot;
 
-				// create a select element (drop down menu)
-				var select = d3.select("body").append("select")
-					.attr("id", "selectVariable" + i)
-					.attr("name", "select" + i)
-					.style("position", "absolute")
-					.style("left", (xOffset + +svg.attr("width"))+ "px").style("top", (yOffset+10) + "px");
-				
-				var optionList = ['']; optionList = optionList.concat(ts.getFields());
-				select.selectAll("option").data(optionList).enter().append("option")
-					.attr("value", function(d) { return d; })
-					.html(function(d) { return d; });
+					// create a select element (drop down menu)
+					var select = d3.select("body").append("select")
+						.attr("id", "selectVariable" + i)
+						//.attr("name", "select" + i)
+						.style("position", "absolute")
+						.style("left", ((xOffset-10) + +svg.attr("width"))+ "px").style("top", (yOffset+10+plot.h/2) + "px");
+					
+					var optionList = ['']; optionList = optionList.concat(ts.getFields());
+					select.selectAll("option").data(optionList).enter().append("option")
+						.attr("value", function(d) { return d; })
+						.html(function(d) { return d; });
 
-				(function(selectNode, plotIndex) {
-					selectNode.addEventListener("change", function() {			
-						var varName = selectNode.options[ selectNode.selectedIndex ].value
-						if (varName == '') {
-							clearPlot(plotIndex);
-						}
-						else
-						{
-							changePlot(plotIndex, varName);
-						}
-					});
-				})(select.node(), i);
+					(function(selectNode, plotIndex) {
+						selectNode.addEventListener("change", function() {			
+							var varName = selectNode.options[ selectNode.selectedIndex ].value
+							if (varName == '') {
+								clearPlot(plotIndex);
+							}
+							else
+							{
+								changePlot(plotIndex, varName);
+							}
+						});
+					})(select.node(), i);
+				}
+				prevH += plot.h
 			}
+			plots.length = PLOT_COUNT;
+		}
+
+		function addView() {
+			PLOT_COUNT++;
+			createViews();
+		}
+		function removeView() {
+			if (PLOT_COUNT > 1) 
+			{
+				PLOT_COUNT--;
+				removeExtraViews();
+			}
+		}
+
+		function removeExtraViews()
+		{
+			for (var i=PLOT_COUNT; true ; i++) 
+			{
+				var plot = plots[i];
+				if (plot) 
+				{
+					plot.remove();
+					plots[i] = undefined;
+
+					// remove group and variable selection widget
+					d3.select("#plotGroup" + i).remove();
+					d3.select("#selectVariable" + i).remove();
+				}
+				else
+				{
+					break;
+				}
+			}
+			plots.length = PLOT_COUNT;
 		}
 
 		function plotBrushCallback(brushedIndex, X)
@@ -234,13 +293,14 @@
 			{
 				var xOffset = PLOT_X_OFFSET;
 				var yOffset = 40+PLOT_Y_OFFSET + plot_h;
+				var plot = plots[i];
 
 				d3.select("#plotGroup" + i)
 					.attr("transform", "translate(" + xOffset + "," + yOffset + ")");
 				
 				// create a select element (drop down menu)
 				d3.select("#selectVariable" + i)
-					.style("left", (xOffset + +svg.attr("width"))+ "px").style("top", (yOffset+10) + "px");	
+					.style("left", (xOffset + +svg.attr("width"))+ "px").style("top", (yOffset+10+ plot.h/2) + "px");	
 				
 				plot_h += PLOT_Y_OFFSET + plots[i].h;
 			}

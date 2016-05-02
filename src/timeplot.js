@@ -213,7 +213,7 @@ function TimeseriesPlot(svg, parentSVG, w, h, brushCallback, offset)
 	this.decorationGroup = this.group.append("g");
 
 	this.decorationRect = this.decorationGroup.append("rect")
-		.style("stroke", "#777777")
+		.style("stroke", "white")
 		.style("stroke-width", "1px")
 		.style("fill", "white").style("fill-opacity", "0.0")
 		.style("shape-rendering", "crispEdges");
@@ -431,6 +431,15 @@ TimeseriesPlot.prototype.remove = function()
 	this.decorationGroup.remove();
 	this.clipPath.remove();
 
+	// remove myself from plot list
+	for (var i=0, N=plotList.length; i<N; i++) 
+	{
+		var plot = plotList[i];
+		if (plot == this) 
+		{
+			plotList.splice(i, 1);
+		}
+	}
 }
 
 TimeseriesPlot.prototype.brushIndex = function(brushedIndex)
@@ -470,9 +479,10 @@ TimeseriesPlot.prototype.brushIndex = function(brushedIndex)
 				.attr("class", "brushCircle")
 				.style("font-family", "Helvetica").style("font-weight", "bold")
 				.style("font-size", "8pt").style("fill", "red").style("stroke", "none")
-				.attr("y", this.yScale(v))
 				.attr("x", 0)
 				.html(actualV.toFixed(2));
+			this.brushText.transition().duration(150).attr("y", this.yScale(v))
+
 		}
 		this.brushedIndex = brushedIndex;
 	}
