@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>EcoTime</title>
+
+	<!-- code delivery network -->
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.6/d3.min.js" charset="utf-8"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/numeric/1.2.6/numeric.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/queue-async/1.0.7/queue.min.js"></script>
+
+	<!-- local libraries -->
+	<script src='lib/papaparse.js' type='text/javascript'></script>
+
+	<!-- sources -->
+	<script src="src/ecodata.js" type="text/javascript"></script>
+	<script src="src/timeseries.js" type="text/javascript"></script>
+	<script src="src/timeplot.js" type="text/javascript"></script>
+
+
+	<style>
+		body {
+			fony-family: Helvetica;
+			font-size: 10pt;
+			/* prevent scrolling */
+			position: fixed; overflow-y:scroll;
+			
+			
+			-webkit-touch-callout: none;
+			-webkit-user-select: none;
+			-khtml-user-select: none;
+			-moz-user-select: none;
+			-ms-user-select: none;
+			user-select: none;
+			
+		}
+		svg{
+			
+			-webkit-touch-callout: none;
+			-webkit-user-select: none;
+			-khtml-user-select: none;
+			-moz-user-select: none;
+			-ms-user-select: none;
+			user-select: none;
+			
+		}
+		select {
+			font-family: Helvetica;
+			font-size: 8pt;
+			width: 100px;
+
+		}
+
+		.lineGraph {
+			stroke: black;
+			stroke-width: 1px;
+			fill: none;
+		}
+		.distRect {
+			fill: #444444;
+			stroke: none;
+		}
+		.brushCircle {
+			fill: red;
+			stroke: none;
+			pointer-events: none;
+		}
+		.timeAxis text {font-family: Helvetica; font-size: 7pt;}
+		.timeAxis line,
+		.timeAxis path {
+			fill: none;
+			stroke: #000;
+			shape-rendering: crispEdges;
+		}
+
+		.timeBrush {
+			font-family: Helvetica;
+			font-size: 10pt;
+		}
+	</style>
+</head>
+
+<body>
+	<svg id="svgMain" width="950" height="800" style="border: solid 0px #cccccc">
+		<defs></defs>
+	</svg>
+
+	<script>
+
+		// global variables
+		var PLOT_W = 870;
+		var PLOT_H = 75;
+		var PLOT_Y_OFFSET = 8;
+		var PLOT_X_OFFSET = 35;
+		var PLOT_COUNT = 6;
+
+		// create a number of time plots
+		var plots = [];
+		var svg = d3.select("#svgMain");
+
+		// load the data
+		var ts = new EcoTimeseries(
+			[
+				'data/indices_02-21-2016g.csv',
+				'data/EcoSpec_Summer_2015_GPP_Reco_data_new_DOY-shifted.csv',
+				'data/Decagon_NDVI_&_PRI_02-27-2017_30min.csv'
+			],
+			dataReady
+		);
+
+		var tsFC = null;
+		var timeAxisGroup = null;
+
+		// initialize user interface
+		initUI();
+
+		function initUI()
+		{
+			d3.select(document)
+				.on("keydown", function() {
+					switch (d3.event.keyCode)
+					{
+					case 38:
+						slideYControlWidget(-1);
+						break;
+					case 40:
+						slideYControlWidget(+1);
+						break;
+					}
+				})
+		}
+
+		function changePlot(plotIndex, varName)
+		{
+			var plot = plots[plotIndex];
+			timeseries = ts.generateOneSeries(varName); 
+			timeseries.normalize();
+			plot.plotLineGraph(timeseries);
+			plot.plotDistribution();		
+		}
+
+		function clearPlot(plotIndex)
+		{
+			plots[plotIndex].clearPlot();
+		}
+
+		function brushTime(X)
+		{
+			timeAxisGroup.selectAll(".timeBrush").remove();	
+			if (X !== undefined && X !== null)
+			{
+				var brushedDate = globalTimeScale.invert(X);
+				timeAxisGroup.append("line")
+					.style("stroke-width", "1px")
+					.style("shape-rendering", "crispEdges")
+					.attr("class", "timeBrush")
+					.attr("x1", X+PLOT_PAD_W).attr("x2", X+PLOT_PAD_W)
+					.attr("y1", 0).attr("y2", -15)
+					.style("stroke", "red").style("fill", "none");
+			
+				var minutes = brushedDate.getMinutes();
+				var formattedDate = 
+					(1+brushedDate.getMonth()) + "/" + brushedDate.getDate() + " " +
+					brushedDate.getHours() + ":" + (minutes < 10 ? '0' : '') + minutes;
+
+				timeAxisGroup.append("text")
+					.attr("class", "timeBrush")
+					.attr("x", X+PLOT_PAD_W).attr("y", -20)
+					.style("fill", "red").style("stroke", "none")
+					.html(formattedDate)
+			}
+
+		}
+		function dataReady()
+		{
+			// create space for scale
+			timeAxisGroup = svg.append("g").attr("transform", "translate(" + PLOT_X_OFFSET + ",35)");
+			drawTimeAxis(timeAxisGroup, ts.getStartDate(), ts.getEndDate(), PLOT_W);
+
+			for (var i=0; i<PLOT_COUNT; i++) 
+			{
+				var xOffset = PLOT_X_OFFSET;
+				var yOffset = 40+PLOT_Y_OFFSET + i*(PLOT_H+PLOT_Y_OFFSET);
+
+				var group = svg.append("g")
+					.attr("id", "plotGroup" + i)
+					.attr("transform", "translate(" + xOffset + "," + yOffset + ")");
+				var plot = new TimeseriesPlot(group, svg, PLOT_W, PLOT_H, plotBrushCallback, [xOffset, yOffset]);
+				plot.setResizeCallback(resizeCallback);
+
+				// keep track of plots
+				plots.push(plot);
+
+				// create a select element (drop down menu)
+				var select = d3.select("body").append("select")
+					.attr("id", "selectVariable" + i)
+					.attr("name", "select" + i)
+					.style("position", "absolute")
+					.style("left", (xOffset + +svg.attr("width"))+ "px").style("top", (yOffset+10) + "px");
+				
+				var optionList = ['']; optionList = optionList.concat(ts.getFields());
+				select.selectAll("option").data(optionList).enter().append("option")
+					.attr("value", function(d) { return d; })
+					.html(function(d) { return d; });
+
+				(function(selectNode, plotIndex) {
+					selectNode.addEventListener("change", function() {			
+						var varName = selectNode.options[ selectNode.selectedIndex ].value
+						if (varName == '') {
+							clearPlot(plotIndex);
+						}
+						else
+						{
+							changePlot(plotIndex, varName);
+						}
+					});
+				})(select.node(), i);
+			}
+		}
+
+		function plotBrushCallback(brushedIndex, X)
+		{
+			brushTime(X);
+
+			for (var i=0; i<PLOT_COUNT; i++)
+			{
+				plots[i].brushIndex(brushedIndex);
+			}
+		}
+
+		function resizeCallback(plot) 
+		{
+			var plot_h = 0;
+			for (var i=0; i<PLOT_COUNT; i++) 
+			{
+				var xOffset = PLOT_X_OFFSET;
+				var yOffset = 40+PLOT_Y_OFFSET + plot_h;
+
+				d3.select("#plotGroup" + i)
+					.attr("transform", "translate(" + xOffset + "," + yOffset + ")");
+				
+				// create a select element (drop down menu)
+				d3.select("#selectVariable" + i)
+					.style("left", (xOffset + +svg.attr("width"))+ "px").style("top", (yOffset+10) + "px");	
+				
+				plot_h += PLOT_Y_OFFSET + plots[i].h;
+			}
+		}
+
+
+
+	</script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</body>
+
+</html>
