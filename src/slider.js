@@ -8,6 +8,10 @@ var SLIDER_LENGTH = 40;
 var SLIDER_THICKNESS = 10;
 var SLIDER_EDGE_SIZE = 5;
 
+var SLIDER_DRAG_EVENT = false;
+var SLIDER_HOVER_COLOR = "magenta";
+var SLIDER_DRAG_COLOR = "red";
+
 
 function RangeSlider(group, orientation, range, position, length, thickness, minLength)
 {
@@ -29,10 +33,20 @@ function RangeSlider(group, orientation, range, position, length, thickness, min
 			.attr("width", function() {  return slider.orientation == 'horizontal' ? slider.length : slider.thickness; })
 			.attr("height", function() { return slider.orientation == 'vertical'   ? slider.length : slider.thickness; })
 			.attr("class", "rangeSlider")
-			.on("mouseover", function() { d3.select(this).style("stroke", "red"); })
-			.on("mouseout", function() { d3.select(this).style("stroke", "none"); })
+			.on("mousemove", function() { 
+				if (!SLIDER_DRAG_EVENT) {
+					d3.select(this).style("stroke",SLIDER_HOVER_COLOR); 
+				}
+			})
+			.on("mouseout", function() { 
+				if (!SLIDER_DRAG_EVENT) {
+					d3.select(this).style("stroke", "none"); 
+				}
+			})
 			.on("mousedown", function() 
 			{
+				SLIDER_DRAG_EVENT = true;
+				slider.widget.style("stroke", SLIDER_DRAG_COLOR);
 				var mouse = d3.mouse(this);
 				mouse[0] -= +d3.select(this).attr("x");
 				mouse[1] -= +d3.select(this).attr("y");
@@ -100,10 +114,8 @@ function RangeSlider(group, orientation, range, position, length, thickness, min
 									delta = Math.min(openSpace, delta);
 									length += delta;
 								}
-
 							}
 						}
-						
 						else if (delta < 0)
 						{
 							if (mode == 1)
@@ -147,16 +159,31 @@ function RangeSlider(group, orientation, range, position, length, thickness, min
 								.attr(slider.orientation == 'horizontal' ? 'width' : 'height', length);
 							
 							if (slider.callback) {
-								slider.callback(position, length);
+								slider.callback(slider.getNormalizedRange());
 							}
 						}
 					})
 					.on("mouseup.sliderDragEvent", function() 
 					{
+						SLIDER_DRAG_EVENT = false;
+						slider.widget.style("stroke", "none").style("stroke-width", "");
 						slider.dragControl = undefined;
 						d3.select(document).on("mouseup.sliderDragEvent", null).on("mousemove.sliderDragEvent", null);
 					});
 			});
 	})(this);
 
+}
+
+RangeSlider.prototype.getNormalizedRange = function() 
+{
+	var rangeDiff = this.range[1]-this.range[0]+1;
+	return [
+		(this.position-this.range[0])/rangeDiff,
+		(this.position+this.length-this.range[0])/rangeDiff
+	];
+}
+
+RangeSlider.prototype.setCallback = function(callback) {
+	this.callback = callback
 }

@@ -165,9 +165,6 @@ EcoTimeseries.prototype.parseComplete = function(url, lineCount)
 	}
 	else
 	{
-		if (this.urlCount == this.urls.length-1) {
-			console.log("Parsing number: " + this.urls.length-1);
-		}
 		this.parse(this.urls[ this.urlCount ]);
 	}
 }
@@ -183,6 +180,7 @@ EcoTimeseries.prototype.fillTimeseries = function()
 	var DAY_INCREMENT = 24*60*60*1000;
 	var READING_INCREMENT = INCREMENT_MINUTE*60*1000;
 
+	var timeLength = 0;
 	for (var day=this.startDate; day <= this.endDate; day += DAY_INCREMENT)
 	{
 		// figure out start/end timestamp
@@ -199,7 +197,7 @@ EcoTimeseries.prototype.fillTimeseries = function()
 		var timeseries = new Timeseries();
 
 		// build the timeseries
-		for (var i=start.getTime(); i<= endTime; i += READING_INCREMENT) 
+		for (var i=start.getTime(); i<= endTime; i += READING_INCREMENT, timeLength++) 
 		{
 			var read = this.readings.get(i);
 			if (read) {
@@ -218,6 +216,7 @@ EcoTimeseries.prototype.fillTimeseries = function()
 		}
 		this.days.set( day, timeseries );
 	}
+	this.timeLength = timeLength;
 
 }
 
@@ -261,6 +260,10 @@ EcoTimeseries.prototype.storeCurrentDay = function()
 	this.currentDay = undefined;
 }
 
+EcoTimeseries.prototype.getTimeLength = function() 
+{
+	return this.timeLength;
+}
 
 EcoTimeseries.prototype.getStartDate = function() {
 	return new Date(this.startDate);

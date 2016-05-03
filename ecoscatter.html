@@ -5,19 +5,23 @@
 
 	<!-- code delivery network -->
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.6/d3.min.js" charset="utf-8"></script>
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/numeric/1.2.6/numeric.min.js"></script>
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/queue-async/1.0.7/queue.min.js"></script>
 
 	<!-- local libraries -->
 	<script src='lib/papaparse.js' type='text/javascript'></script>
+
+	<!-- common ui components -->
+	<script src="src/slider.js" type="text/javascript"></script>
+	<script src="src/listselection.js" type="text/javascript"></script>
 
 	<!-- sources -->
 	<script src="src/ecodata.js" type="text/javascript"></script>
 	<script src="src/timeseries.js" type="text/javascript"></script>
 	<script src="src/scatterplot.js" type="text/javascript"></script>
 	<script src="src/timeplot.js" type="text/javascript"></script>
-	<script src="src/slider.js" type="text/javascript"></script>
 
+
+	<link href='https://fonts.googleapis.com/css?family=Anonymous+Pro:400,700' rel='stylesheet' type='text/css'>
 
 	<style>
 		body {
@@ -52,9 +56,9 @@
 			width: 100px;
 		}
 		
-		.timeAxis text {font-family: Helvetica; font-size: 8pt;}
-		.timeAxis line,
-		.timeAxis path {
+		.axis text {font-family: Helvetica; font-size: 8pt;}
+		.axis line,
+		.axis path {
 			fill: none;
 			stroke: #000;
 			shape-rendering: crispEdges;
@@ -64,7 +68,15 @@
 		{
 			storke: none;
 			fill: black;
-			fill-opacity: 0.7;
+			fill-opacity: 0.05;
+		}
+
+		.connectedScatter
+		{
+			stroke: #ffad33;
+			stroke-width: 1px;
+			stroke-opacity: 0.5;
+			fill: none;
 		}
 
 		.rangeSlider
@@ -79,13 +91,64 @@
 			font-family: Helvetica;
 			font-size: 12pt;
 		}
+
+		.xVarName {
+			font-family: 'Anonymous Pro', 'Helvetica';
+			font-size: 11px;
+			fill: red;
+			stroke: none;
+			-webkit-touch-callout: none;
+			-webkit-user-select: none;
+			-khtml-user-select: none;
+			-moz-user-select: none;
+			-ms-user-select: none;
+			user-select: none;
+			cursor: pointer;
+		}
+		.yVarName {
+			font-family: 'Anonymous Pro', 'Helvetica';
+			font-size: 14px;
+			fill: red;
+			stroke: none;
+			-webkit-touch-callout: none;
+			-webkit-user-select: none;
+			-khtml-user-select: none;
+			-moz-user-select: none;
+			-ms-user-select: none;
+			user-select: none;
+			cursor: pointer;
+		}
+
+		/* drop down variable selection text */
+		.listSelection {
+			font-family: 'Anonymous Pro', 'Helvetica';
+			font-size: 11px;
+		}
+		.listSelectionDiv {
+			position: absolute;
+			z-index: 100;
+			overflow-y: scroll;
+			background-color: white;
+			border: solid 1px #cccccc;
+			line-height: 90%;
+			padding: 10px 10px;
+			-webkit-touch-callout: none;
+			-webkit-user-select: none;
+			-khtml-user-select: none;
+			-moz-user-select: none;
+			-ms-user-select: none;
+			user-select: none;
+			cursor: default;
+		}
 	</style>
 </head>
 
 <body>
 	<div>
 		<button onclick="addScatter()">+</button>&nbsp;
-		<button onclick="removeScatter()">&nbsp;-&nbsp;</button>
+		<button onclick="removeScatter()">&nbsp;-&nbsp;</button>&nbsp;
+		<input id="checkShowPoints" type="checkbox" onclick="scatterVisibility()">Show points &nbsp;
+		<input id="checkShowConnected" type="checkbox" onclick="scatterVisibility()">Show lines
 	</div>
 	<svg id="mainSVG" width="1000" height="1000" border="solid 1px black"></svg>
 
@@ -94,6 +157,8 @@
 		// global variables
 		var X_TIME_OFFSET = 45;
 		var Y_TIME_OFFSET = 30;
+		var X_SCATTER_OFFSET = X_TIME_OFFSET + 50;
+		var Y_SCATTER_OFFSET = 0;
 		var TIME_AXIS_HEIGHT = 500;
 
 		// the SVG
@@ -119,10 +184,7 @@
 		{
 			console.log("data ready!");
 			makeTimeAxis();
-			var slider = new RangeSlider(
-				svg.append("g").attr("transform", "translate(" + X_TIME_OFFSET + "," + Y_TIME_OFFSET + ")"),
-				'vertical', [0, 500], 100, 200
-			);
+			initUI();
 		}
 
 		function makeTimeAxis()
@@ -131,7 +193,7 @@
 			if (timeAxisGroup.size() == 0) {
 				timeAxisGroup = svg.append("g")
 					.attr("id", "timeAxisGroup")
-					.attr("class", "timeAxis")
+					.attr("class", "axis")
 					.attr("transform", "translate(" + X_TIME_OFFSET + "," + Y_TIME_OFFSET + ")");
 			}
 
@@ -154,12 +216,63 @@
 
 		function addScatter()
 		{
+			var N = this.scatterRows.length;
 
+			// slider
+			var sliderX = (2+X_TIME_OFFSET) + N*(SLIDER_THICKNESS+1);
+			var sliderY = Y_TIME_OFFSET;
+			
+			// scatterplot
+			var scatterX = X_SCATTER_OFFSET;
+			var scatterY = Y_TIME_OFFSET + N*(SCATTER_H+Y_SCATTER_OFFSET);
+
+			// create the actual slider
+			var sliderGroup = svg.append("g")
+				.attr("transform", "translate(" + sliderX + "," + sliderY + ")");
+			var slider = new RangeSlider(sliderGroup, 'vertical', [0, 500], 100, 200);
+
+			// create group for the scatterplot row
+			var scatterGroup = svg.append("g")
+				.attr("transform", "translate(" + scatterX + "," + scatterY + ")");
+
+			// add the scatterplot row
+			var timeRange = timeRangeFromNormalized(slider.getNormalizedRange());
+			var row = new ScatterplotRow(scatterGroup, 'fc', ['PRIsn', 'LE', 'VPD', 'Tsoil', 'fc'], 0, 0, timeRange);
+			scatterRows.push(row);
+
+			// create slider callback
+			(function(scatterRow, slider) 
+			{
+				slider.setCallback( function(nRange) 
+				{
+					var timeRange = timeRangeFromNormalized(nRange);
+					scatterRow.setTimeRange( timeRange );
+				});
+			})(row, slider)
 		}
 
 		function removeScatter()
 		{
 
+		}
+
+		function timeRangeFromNormalized(nRange)
+		{
+			var N = ts.getTimeLength();		
+			return [ Math.floor(nRange[0] * (N-1)+0.5), Math.min(N-1,Math.floor(nRange[1] * (N-1)+0.5)) ];
+		}
+
+		function scatterVisibility()
+		{
+			POINT_VISIBILITY = d3.select("#checkShowPoints").node().checked;
+			CONNECTED_VISIBILITY = d3.select("#checkShowConnected").node().checked;
+			toggleScatterElementVisibility();
+		}
+
+		function initUI()
+		{
+			d3.select("#checkShowPoints").node().checked = POINT_VISIBILITY;
+			d3.select("#checkShowConnected").node().checked = CONNECTED_VISIBILITY;
 		}
 	</script>
 </body>
