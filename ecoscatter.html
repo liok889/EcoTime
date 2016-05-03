@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>EcoScatter</title>
+
+	<!-- code delivery network -->
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.6/d3.min.js" charset="utf-8"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/numeric/1.2.6/numeric.min.js"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/queue-async/1.0.7/queue.min.js"></script>
+
+	<!-- local libraries -->
+	<script src='lib/papaparse.js' type='text/javascript'></script>
+
+	<!-- sources -->
+	<script src="src/ecodata.js" type="text/javascript"></script>
+	<script src="src/timeseries.js" type="text/javascript"></script>
+	<script src="src/scatterplot.js" type="text/javascript"></script>
+	<script src="src/timeplot.js" type="text/javascript"></script>
+	<script src="src/slider.js" type="text/javascript"></script>
+
+
+	<style>
+		body {
+			fony-family: Helvetica;
+			font-size: 10pt;
+			/* prevent scrolling */
+			position: fixed; overflow-y:scroll;
+			
+			
+			-webkit-touch-callout: none;
+			-webkit-user-select: none;
+			-khtml-user-select: none;
+			-moz-user-select: none;
+			-ms-user-select: none;
+			user-select: none;	
+		}
+
+		svg{
+			
+			-webkit-touch-callout: none;
+			-webkit-user-select: none;
+			-khtml-user-select: none;
+			-moz-user-select: none;
+			-ms-user-select: none;
+			user-select: none;
+			
+		}
+
+		select {
+			font-family: Helvetica;
+			font-size: 8pt;
+			width: 100px;
+		}
+		
+		.timeAxis text {font-family: Helvetica; font-size: 8pt;}
+		.timeAxis line,
+		.timeAxis path {
+			fill: none;
+			stroke: #000;
+			shape-rendering: crispEdges;
+		}
+
+		.scatterplotCircle 
+		{
+			storke: none;
+			fill: black;
+			fill-opacity: 0.7;
+		}
+
+		.rangeSlider
+		{
+			stroke: none;
+			stroke-width: 1px;
+			fill: #b3d9ff;
+			shape-rendering: crispEdges;
+		}
+
+		button {
+			font-family: Helvetica;
+			font-size: 12pt;
+		}
+	</style>
+</head>
+
+<body>
+	<div>
+		<button onclick="addScatter()">+</button>&nbsp;
+		<button onclick="removeScatter()">&nbsp;-&nbsp;</button>
+	</div>
+	<svg id="mainSVG" width="1000" height="1000" border="solid 1px black"></svg>
+
+	<script type="text/javascript">
+
+		// global variables
+		var X_TIME_OFFSET = 45;
+		var Y_TIME_OFFSET = 30;
+		var TIME_AXIS_HEIGHT = 500;
+
+		// the SVG
+		var svg = d3.select("#mainSVG");
+
+		// list of scatter rows
+		var scatterRows = [];
+
+		// load the data
+		var ts = new EcoTimeseries(
+			[
+				'data/indices_02-21-2016g.csv',
+				'data/EcoSpec_Summer_2015_GPP_Reco_data_new_DOY-shifted.csv',
+				'data/Decagon_NDVI_&_PRI_02-27-2017_30min.csv'
+			],
+			dataReady
+		);
+
+		var timeAxisGroup = null;
+		var globalTimeScale = null;
+
+		function dataReady()
+		{
+			console.log("data ready!");
+			makeTimeAxis();
+			var slider = new RangeSlider(
+				svg.append("g").attr("transform", "translate(" + X_TIME_OFFSET + "," + Y_TIME_OFFSET + ")"),
+				'vertical', [0, 500], 100, 200
+			);
+		}
+
+		function makeTimeAxis()
+		{
+			var timeAxisGroup = svg.select("#timeAxisGroup");
+			if (timeAxisGroup.size() == 0) {
+				timeAxisGroup = svg.append("g")
+					.attr("id", "timeAxisGroup")
+					.attr("class", "timeAxis")
+					.attr("transform", "translate(" + X_TIME_OFFSET + "," + Y_TIME_OFFSET + ")");
+			}
+
+			if (!globalTimeScale)
+			{
+				var tDomain = [ts.getStartDate(), ts.getEndDate()];
+				globalTimeScale = d3.time.scale()
+					.domain(tDomain)
+					.range([0, TIME_AXIS_HEIGHT]);
+			
+				var timeAxis = d3.svg.axis()
+					.scale(globalTimeScale)
+					.orient('left')
+					.tickFormat(d3.time.format('%m/%d'))
+					.tickSize(4);
+			}
+
+			timeAxisGroup.call(timeAxis);
+		}
+
+		function addScatter()
+		{
+
+		}
+
+		function removeScatter()
+		{
+
+		}
+	</script>
+</body>
+</html>

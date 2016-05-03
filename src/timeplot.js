@@ -22,26 +22,24 @@ var MIN_PLOT_W = 40;
 var MAX_PLOT_W = 2000;
 var MAX_PLOT_H = 500;
 
-function drawTimeAxis(group, startDate, endDate, width)
+function drawTimeAxis(group, startDate, endDate, width, pad, orientation)
 {
 	if (!globalTimeScale)
 	{
 		tDomain = [startDate, endDate];
 		globalTimeScale = d3.time.scale()
 			.domain([startDate, endDate])
-			.range([0, width-PLOT_PAD_W*2]);
+			.range([0, width - (pad !== undefined ? pad*2 : PLOT_PAD_W*2) ]);
 		
 		globalXAxis = d3.svg.axis()
 			.scale(globalTimeScale)
-			.orient('top')
-			//.ticks(d3.time.days, 1)
+			.orient(orientation || 'top')
 			.tickFormat(d3.time.format('%m/%d'))
-			//.tickSize(2)
-			//.tickPadding(20);
+			.tickSize(2)
 
 		timeAxis = group.append('g')
 			.attr('class', 'timeAxis')
-			.attr('transform', 'translate(' + PLOT_PAD_W + ',0)')
+			.attr('transform', 'translate(' + (pad !== undefined ? pad : PLOT_PAD_W) + ',0)')
 			.call(globalXAxis);
 	}
 	else
@@ -464,10 +462,15 @@ TimeseriesPlot.prototype.brushIndex = function(brushedIndex)
 			}
 			this.brushCircle
 				.attr("class", "brushCircle")
+				.style("fill", "red")
 				.attr("cx", globalXScale(brushedIndex))
 				.attr("cy", this.yScale(v))
 				.attr("r", "3px");
-			
+
+			if (!this.brushRect) {
+				this.brushRect = this.plotGroup.append("rect");
+			}
+
 			if (!this.brushText) {
 				this.brushText = this.plotGroup.append("text");
 			}
@@ -479,9 +482,19 @@ TimeseriesPlot.prototype.brushIndex = function(brushedIndex)
 				.attr("class", "brushCircle")
 				.style("font-family", "Helvetica").style("font-weight", "bold")
 				.style("font-size", "8pt").style("fill", "red").style("stroke", "none")
+				.style("background-color", "white")
 				.attr("x", 0)
 				.html(actualV.toFixed(2));
 			this.brushText.transition().duration(150).attr("y", this.yScale(v))
+
+			SVGRect = this.brushText.node().getBBox();
+			this.brushRect
+				.attr("class", "brushCricle")
+				.attr("x", SVGRect.x)
+				.attr("width", SVGRect.width)
+				.attr("height", SVGRect.height+2)
+				.style("fill", "white");
+			this.brushRect.transition().duration(150).attr("y", this.yScale(v)-SVGRect.height+1)
 
 		}
 		this.brushedIndex = brushedIndex;

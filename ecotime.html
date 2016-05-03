@@ -62,7 +62,6 @@
 
 		}
 		.brushCircle {
-			fill: red;
 			stroke: none;
 			pointer-events: none;
 		}
@@ -180,6 +179,7 @@
 					.attr("class", "timeBrush")
 					.attr("x", X+PLOT_PAD_W).attr("y", -20)
 					.style("fill", "red").style("stroke", "none")
+					.style("background-color", "white")
 					.html(formattedDate)
 			}
 
