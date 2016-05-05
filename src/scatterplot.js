@@ -1,6 +1,6 @@
 
-var SCATTER_PAD_W = 20;
-var SCATTER_PAD_H = 20;
+var SCATTER_PAD_W = 10;
+var SCATTER_PAD_H = 10;
 var SCATTER_W = 150;
 var SCATTER_H = 150;
 var SCATTER_X_OFFSET = 0;
@@ -9,7 +9,7 @@ var SELECTION_LIST_W = 200;
 var SELECTION_LIST_H = 350;
 
 // scatterplot circle radius
-var SCATTER_CIRCLE_RADIUS = 3;
+var SCATTER_CIRCLE_RADIUS = 2;
 
 // controls visibility of points / connection lines
 var POINT_VISIBILITY = true;
