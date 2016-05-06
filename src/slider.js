@@ -3,7 +3,7 @@
  * ---------------------------------------
  */
 
-var SLIDER_MIN_LENGTH = 30;
+var SLIDER_MIN_LENGTH = 20;
 var SLIDER_LENGTH = 40;
 var SLIDER_THICKNESS = 10;
 var SLIDER_EDGE_SIZE = 5;
@@ -146,7 +146,9 @@ function RangeSlider(group, orientation, range, position, length, thickness, min
 							}
 						}
 						
-
+						if (slider.fixedPosition) {
+							position = _position;
+						}
 						if (delta != 0 && (position != _position || length != _length)) 
 						{					
 							// update the slider
@@ -174,6 +176,10 @@ function RangeSlider(group, orientation, range, position, length, thickness, min
 
 }
 
+RangeSlider.prototype.setFixedPosition = function(fixed)
+{
+	this.fixedPosition = fixed;
+}
 RangeSlider.prototype.getNormalizedRange = function() 
 {
 	var rangeDiff = this.range[1]-this.range[0]+1;

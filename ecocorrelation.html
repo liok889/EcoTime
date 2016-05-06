@@ -46,7 +46,6 @@
 			-moz-user-select: none;
 			-ms-user-select: none;
 			user-select: none;
-			
 		}
 
 		select {
@@ -171,6 +170,8 @@
 			fill: none;
 			stroke-width: 2px;
 		}
+		.lineChartPath
+		{}
 		.legendCircle {
 			stroke: none;
 		}
@@ -181,6 +182,13 @@
 			stroke: none;
 			cursor: pointer;
 		}
+
+		#guideLines
+		{
+			stroke: #cccccc;
+			stroke-width: 1px;
+			shape-rendering: crispEdges;		
+		}
 	</style>
 </head>
 
@@ -189,13 +197,16 @@
 		<button onclick="addVariable()">+</button>&nbsp;
 		<button onclick="removeVariable()">&nbsp;-&nbsp;</button>&nbsp;
 	</div>
-	<svg id="mainSVG" width="1000" height="1000" border="solid 1px black"></svg>
+	<svg id="mainSVG" width="1000" height="1000" border="solid 1px black">
+		<defs></defs>
+	</svg>
 
 	<script type="text/javascript">
 		
 		var svg = d3.select('#mainSVG');
 		var correlationMap = d3.map();
-		var globalTimeScale = null;
+		var globalTimeScale = null, tDomain = null, globalRScale = null;
+		var globalXScale = null;
 		var correlationMap = d3.map();
 		var corrVariables = [];
 		var corrTarget = 'fc';
@@ -206,10 +217,10 @@
 		// sliding time window during which to calculate correlations
 		var timeWindow = 24*2*7+1;
 
-		var X_OFFSET = 20;
+		var X_OFFSET = 35;
 		var Y_OFFSET = 40;
-		var CHART_W = 700;
-		var CHART_H = 130;
+		var CHART_W = 850;
+		var CHART_H = 170;
 		var COLORS = ['#66c2a5','#fc8d62','#8da0cb','#e78ac3','#a6d854','#ffd92f'].reverse();	
 
 		var pathGenerator = null;
@@ -236,8 +247,8 @@
 			// create a path generator
 			var N = ts.getTimeLength()-1;
 			pathGenerator = d3.svg.line().interpolate('linear')
-				.x(function(d) { return (d.x / N) * CHART_W; })
-				.y(function(d) { return (1-d.y)*CHART_H; });
+				.x(function(d) { return globalXScale(d.x); /* / N) * CHART_W;*/ })
+				.y(function(d) { return globalRScale(d.y); });
 
 		}
 
@@ -277,6 +288,46 @@
 			legendGroup = svg.append("g")
 				.attr("transform", "translate(" + (X_OFFSET+CHART_W+15) + ',' + (Y_OFFSET+20) + ")");
 
+			decorationGroup = svg.append("g")
+				.attr("transform", "translate(" + X_OFFSET + "," + Y_OFFSET + ")");
+			decorationGroup.append("rect")
+				.attr("width", CHART_W).attr("height", CHART_H)
+				.style("fill","white").style("fill-opacity", 0.0).style("storke", "none");
+
+			if (!globalZoom) {
+				globalZoom = d3.behavior.zoom()
+				.x(globalXScale)
+				.on("zoomstart", function() {
+				})
+				.on("zoomend", function() {
+				})
+				.on("zoom", function() {
+					zoomChart();
+				});
+			}
+			decorationGroup.call(globalZoom);
+
+			// add slider
+			var sliderGroup = svg.append("g")
+				.attr("transform", "translate(" + X_OFFSET + "," + (Y_OFFSET + CHART_H+20) + ")");
+			var slider = new RangeSlider(sliderGroup, 'horizontal', 
+				[0, CHART_W], 0, globalXScale(timeWindow*4), 15, 15);
+			
+			svg.append('text')
+				.attr('id', "timeSliderText")
+				.attr('x', X_OFFSET).attr('y', (Y_OFFSET+CHART_H+20+30)).html('');
+
+			slider.setFixedPosition(true);
+			slider.setCallback(function(nRange) {
+				var n = (nRange[1]/4) * (ts.getTimeLength()-1);
+				timeWindow = Math.floor(n);
+				//console.log("time window: " + timeWindow)
+				updateCorrelations();
+
+				var days = Math.floor(n/(24*2));
+				var hours = ((n-days*24*2)/2);
+				d3.select("#timeSliderText").html("Time window: days: " + days + ", hours: " + hours.toFixed(2));
+			})
 		}
 
 		function updateCorrelations(oneVariable)
@@ -391,7 +442,7 @@
 					if (v !== undefined && v.n > 1 && !isNaN(v.r)) 
 					{
 						if (!chunk) chunk = [];
-						chunk.push({x: v.mid, y: Math.abs(v.r)});
+						chunk.push({x: v.mid, y: /* Maths.abs */(v.r)});
 					}
 					else
 					{
@@ -414,13 +465,14 @@
 			// create chart groups
 			var group = lineChartGroup.selectAll("g.lineChart").data(allChunks);
 			group.enter().append("g")
+				.attr("clip-path", "url(#" + "plotClip)")
 				.attr('class', 'lineChart');
 
 			group.attr('stroke', function(d, i) { return COLORS[i]; });
 			group.exit().remove();
 
 			var chunks = group.selectAll("path").data(function(d) { return d; });
-			chunks.enter().append('path');
+			chunks.enter().append('path').attr('class', 'lineChartPath');
 			chunks
 				.attr('d', function(d) { return pathGenerator(d); })
 			chunks.exit().remove();
@@ -471,31 +523,70 @@
 		function makeAxes()
 		{
 
-			var timeAxisGroup = svg.select("#timeAxisGroup");
+			var clipPath = svg.select("defs").append("clipPath")
+				.attr("id", "plotClip");
+			var clipRect = clipPath.append("rect")
+				.attr("x", 0).attr("y", 0)
+				.attr("width", CHART_W).attr("height", CHART_H);
+
+			// X axis; time
+			timeAxisGroup = svg.select("#timeAxisGroup");
 			if (timeAxisGroup.size() == 0) 
 			{
 				timeAxisGroup = svg.append("g")
 					.attr("id", "timeAxisGroup")
 					.attr("class", "axis")
-					.attr("transform", "translate(" + X_OFFSET + "," + (Y_OFFSET + CHART_H + 5) + ")");
+					.attr("transform", "translate(" + X_OFFSET + "," + (Y_OFFSET + CHART_H + 0) + ")");
 			
 			}
 
+			// global X Scale
+			globalXScale = d3.scale.linear().domain([0, ts.getTimeLength()-1]).range([0, CHART_W])
+
 			if (!globalTimeScale)
 			{
-				var tDomain = [ts.getStartDate(), ts.getEndDate()];
+				tDomain = [ts.getStartDate(), ts.getEndDate()];
 				globalTimeScale = d3.time.scale()
 					.domain(tDomain)
 					.range([0, CHART_W]);
 			
-				var timeAxis = d3.svg.axis()
+				timeAxis = d3.svg.axis()
 					.scale(globalTimeScale)
 					.orient('bottom')
 					.tickFormat(d3.time.format('%m/%d'))
 					.tickSize(4);
 			}
-
 			timeAxisGroup.call(timeAxis);
+
+
+			// Y axis: correlation coefficient
+			var rAxisGroup = svg.select("#rAxisGroup");
+			if (rAxisGroup.size() == 0) 
+			{
+				rAxisGroup = svg.append("g")
+					.attr("id", "rAxisGroup")
+					.attr("class", "axis")
+					.attr("transform", "translate(" + (X_OFFSET-2) + "," + Y_OFFSET + ")");
+			}
+
+			globalRScale = d3.scale.linear().domain([-1, 1]).range([CHART_H, 0]);
+			var rAxis = d3.svg.axis()
+				.scale(globalRScale).orient('left').ticks(5);
+			rAxisGroup.call(rAxis);
+
+			// zero line
+			var guideLines = svg.select("#guideLines");
+			if (guideLines.size() == 0) {
+				guideLines = svg.append("g").attr("id", "guideLines");
+				guideLines.append("line")
+					.attr("x1", X_OFFSET).attr("y1", Y_OFFSET+globalRScale(0))
+					.attr("x2", X_OFFSET+CHART_W).attr("y2", Y_OFFSET+globalRScale(0))
+
+				guideLines.append("line")
+					.attr("x1", X_OFFSET).attr("y1", Y_OFFSET+globalRScale(1))
+					.attr("x2", X_OFFSET+CHART_W).attr("y2", Y_OFFSET+globalRScale(1))
+
+			}
 		}
 
 		function addVariable()
@@ -524,6 +615,35 @@
 
 				drawCorrelations();
 			}
+		}
+
+
+		function zoomChart()
+		{
+
+			// update charts
+			svg.selectAll("path.lineChartPath")
+				.attr("d", function(d) { return pathGenerator(d); });
+
+
+			// update time axis
+			var xDomain = globalXScale.domain();
+			var transfer = d3.scale.linear()
+				.domain([0, ts.getTimeLength()-1])
+				.range([tDomain[0].getTime(), tDomain[1].getTime()]);
+			
+			var newTimeDomain = [new Date(transfer(xDomain[0])), new Date(transfer(xDomain[1]))];
+			globalTimeScale.domain(newTimeDomain);
+			var days = (newTimeDomain[1].getTime() - newTimeDomain[0].getTime()) / (24*60*60*1000);
+			if (days <= 7) {
+				timeAxis.tickFormat(d3.time.format('%m/%d %H:%M'));
+			}
+			else
+			{
+				timeAxis.tickFormat(d3.time.format('%m/%d'));
+			}
+			timeAxisGroup.call(timeAxis);
+
 		}
 
 
