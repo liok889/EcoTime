@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>EcoCorrelation</title>
+
+	<!-- code delivery network -->
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.6/d3.min.js" charset="utf-8"></script>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/queue-async/1.0.7/queue.min.js"></script>
+
+	<!-- local libraries -->
+	<script src='lib/papaparse.js' type='text/javascript'></script>
+
+	<!-- common ui components -->
+	<script src="src/slider.js" type="text/javascript"></script>
+	<script src="src/listselection.js" type="text/javascript"></script>
+
+	<!-- sources -->
+	<script src="src/ecodata.js" type="text/javascript"></script>
+	<script src="src/timeseries.js" type="text/javascript"></script>
+	<script src="src/scatterplot.js" type="text/javascript"></script>
+	<script src="src/timeplot.js" type="text/javascript"></script>
+
+	<link href='https://fonts.googleapis.com/css?family=Anonymous+Pro:400,700' rel='stylesheet' type='text/css'>
+
+	<style>
+		body {
+			fony-family: Helvetica;
+			font-size: 10pt;
+			/* prevent scrolling */
+			position: fixed; overflow-y:scroll;
+			
+			
+			-webkit-touch-callout: none;
+			-webkit-user-select: none;
+			-khtml-user-select: none;
+			-moz-user-select: none;
+			-ms-user-select: none;
+			user-select: none;	
+		}
+
+		svg{
+			
+			-webkit-touch-callout: none;
+			-webkit-user-select: none;
+			-khtml-user-select: none;
+			-moz-user-select: none;
+			-ms-user-select: none;
+			user-select: none;
+			
+		}
+
+		select {
+			font-family: Helvetica;
+			font-size: 8pt;
+			width: 100px;
+		}
+		
+		.axis text {font-family: Helvetica; font-size: 7pt;}
+		.axis line,
+		.axis path {
+			fill: none;
+			stroke: #000;
+			shape-rendering: crispEdges;
+		}
+
+		.scatterplotCircle 
+		{
+			storke: none;
+			fill: black;
+			fill-opacity: 0.05;
+		}
+
+		.connectedScatter
+		{
+			stroke: #ffad33;
+			stroke-width: 1px;
+			stroke-opacity: 0.5;
+			fill: none;
+		}
+
+		.rangeSlider
+		{
+			stroke: none;
+			stroke-width: 1px;
+			fill: #b3d9ff;
+			shape-rendering: crispEdges;
+		}
+
+		button {
+			font-family: Helvetica;
+			font-size: 12pt;
+		}
+
+		.xVarName {
+			font-family: 'Anonymous Pro', 'Helvetica';
+			font-size: 11px;
+			fill: red;
+			stroke: none;
+			-webkit-touch-callout: none;
+			-webkit-user-select: none;
+			-khtml-user-select: none;
+			-moz-user-select: none;
+			-ms-user-select: none;
+			user-select: none;
+			cursor: pointer;
+		}
+		.yVarName {
+			font-family: 'Anonymous Pro', 'Helvetica';
+			font-size: 14px;
+			fill: red;
+			stroke: none;
+			-webkit-touch-callout: none;
+			-webkit-user-select: none;
+			-khtml-user-select: none;
+			-moz-user-select: none;
+			-ms-user-select: none;
+			user-select: none;
+			cursor: pointer;
+		}
+
+		/* drop down variable selection text */
+		.listSelection {
+			font-family: 'Anonymous Pro', 'Helvetica';
+			font-size: 11px;
+		}
+		.listSelectionDiv {
+			position: absolute;
+			z-index: 100;
+			overflow-y: scroll;
+			background-color: white;
+			border: solid 1px #cccccc;
+			line-height: 90%;
+			padding: 10px 10px;
+			-webkit-touch-callout: none;
+			-webkit-user-select: none;
+			-khtml-user-select: none;
+			-moz-user-select: none;
+			-ms-user-select: none;
+			user-select: none;
+			cursor: default;
+		}
+
+		text {
+			font-family: 'Helvetica';
+			font-size: 12px;
+			fill: black;
+			stroke: none;
+			-webkit-touch-callout: none;
+			-webkit-user-select: none;
+			-khtml-user-select: none;
+			-moz-user-select: none;
+			-ms-user-select: none;
+			user-select: none;
+			cursor: default;
+		}
+
+		.varName {
+			font-family: 'Anonymous Pro', 'Helvetica';
+			font-size: 12px;
+			fill: red;
+			stroke: none;
+			-webkit-touch-callout: none;
+			-webkit-user-select: none;
+			-khtml-user-select: none;
+			-moz-user-select: none;
+			-ms-user-select: none;
+			user-select: none;
+			cursor: pointer;
+		}
+		.lineChart {
+			fill: none;
+			stroke-width: 2px;
+		}
+		.legendCircle {
+			stroke: none;
+		}
+		.legendText 
+		{
+			font-family: Helvetica;
+			fill: black;
+			stroke: none;
+			cursor: pointer;
+		}
+	</style>
+</head>
+
+<body>
+	<div>
+		<button onclick="addVariable()">+</button>&nbsp;
+		<button onclick="removeVariable()">&nbsp;-&nbsp;</button>&nbsp;
+	</div>
+	<svg id="mainSVG" width="1000" height="1000" border="solid 1px black"></svg>
+
+	<script type="text/javascript">
+		
+		var svg = d3.select('#mainSVG');
+		var correlationMap = d3.map();
+		var globalTimeScale = null;
+		var correlationMap = d3.map();
+		var corrVariables = [];
+		var corrTarget = 'fc';
+		var corrSeries = [];
+
+		var lineChartGroup = null;
+
+		// sliding time window during which to calculate correlations
+		var timeWindow = 24*2*7+1;
+
+		var X_OFFSET = 20;
+		var Y_OFFSET = 40;
+		var CHART_W = 700;
+		var CHART_H = 130;
+		var COLORS = ['#66c2a5','#fc8d62','#8da0cb','#e78ac3','#a6d854','#ffd92f'].reverse();	
+
+		var pathGenerator = null;
+
+		// load the data
+		var ts = new EcoTimeseries(
+			[
+				'data/indices_mid-day_avg_prep_02-21-2016g_flagExcluded.csv',
+				'data/EcoSpec_Summer_2015_GPP_Reco_data_new_DOY-shifted.csv',
+				'data/Decagon_NDVI_&_PRI_02-27-2017_30min.csv'
+			],
+
+			// callback function when the data has been loaded
+			dataReady
+		);
+
+		// initialize the visualization
+		function dataReady()
+		{
+			console.log("data ready!");
+			makeAxes();
+			initVis();
+
+			// create a path generator
+			var N = ts.getTimeLength()-1;
+			pathGenerator = d3.svg.line().interpolate('linear')
+				.x(function(d) { return (d.x / N) * CHART_W; })
+				.y(function(d) { return (1-d.y)*CHART_H; });
+
+		}
+
+		function initVis()
+		{
+			// add a text on the variable to use for correlation
+			svg.append("text")
+				.attr("x", X_OFFSET).attr("y", 20)
+				.html("Correlation with: ");
+			
+			var varNameText = svg.append("text")
+				.attr('class', 'varName')
+				.attr("x", X_OFFSET + 95).attr("y", 20)
+				.html(corrTarget);
+			
+			// attach a menu to variable name
+			(function(varNameText) {
+				varNameText.on("click", function() 
+				{
+				 	var mouse = d3.mouse(document.body);
+					var selectionDiv = new ListSelection(
+						mouse[0], mouse[1], null, null,
+						ts.getFields()
+					);
+
+					selectionDiv.setCallbacks(function(varName) {
+						varNameText.html(varName);
+						corrTarget = varName;
+						updateCorrelations();
+					});
+				});
+			})(varNameText);
+
+			// create a group for line charts
+			lineChartGroup = svg.append("g")
+				.attr("transform", "translate(" + X_OFFSET + ',' + Y_OFFSET + ")");
+			legendGroup = svg.append("g")
+				.attr("transform", "translate(" + (X_OFFSET+CHART_W+15) + ',' + (Y_OFFSET+20) + ")");
+
+		}
+
+		function updateCorrelations(oneVariable)
+		{
+			var timeLength = ts.getTimeLength();
+			var target = ts.generateOneSeries(corrTarget).getSeries();
+
+			// set the size of correlation matrix
+			corrSeries.length = corrVariables.length;
+			for (var i=0; i<corrVariables.length; i++) 
+			{
+				var windowMid = Math.floor(timeWindow / 2) + 1;
+				var varName = corrVariables[i];
+
+				if (oneVariable !== undefined && oneVariable !== null && oneVariable !== varName) {
+					continue;
+				}
+
+				var other = ts.generateOneSeries( varName ).getSeries();
+				var corrTS = new Timeseries();
+				var series = corrTS.getSeries();
+
+				// fill the initial window
+				var N = 0;
+				var sumXY = 0;
+				var sumX = 0, sumY = 0;
+				var sumXsq = 0, sumYsq = 0;
+
+				for (var j=0; j< timeWindow; j++) 
+				{
+					var b = target[j] !== null && other[j] !== null;
+					var t = b ? target[j] : 0;
+					var o = b ?  other[j] : 0;
+
+					// update running sums
+					sumX  += t;
+					sumY  += o;
+					sumXY += t*o;
+					
+					sumXsq += Math.pow(t, 2);
+					sumYsq += Math.pow(o, 2);
+
+					N += b ? 1 : 0; 
+				}
+
+				// advance the window one at a time
+				for (var m=0, j=timeWindow-1; j<timeLength; j++, m++, windowMid++) 
+				{
+					var r = NaN;
+					if (N > 1)
+					{
+						var z1 = Math.sqrt( N * sumXsq - Math.pow(sumX,2) );
+						var z2 = Math.sqrt( N * sumYsq - Math.pow(sumY,2) );
+						
+						// calculate r
+						r = N * sumXY - sumX * sumY;
+						r /= z1*z2;
+
+						if (isNaN(z2)) {
+							console.log("z2 is NAN!");
+						}
+					}
+
+					// store R
+					series.push({r: r, n: N, mid: windowMid});
+
+					// advance the windows by updating the sums
+					var n=j+1;
+					if (n < timeLength) 
+					{
+						var b0 = target[m] !== null && other[m] !== null;
+						var b1 = target[n] !== null && other[n] !== null;
+
+						var t0 = b0 ? target[m] : 0;
+						var t1 = b1 ? target[n] : 0;
+
+						var o0 = b0 ?  other[m] : 0;
+						var o1 = b1 ?  other[n] : 0;
+
+						sumX += -t0 + t1;
+						sumY += -o0 + o1;
+						sumXY += -t0*o0 + t1*o1;
+
+						// subtract
+						sumXsq += -Math.pow(t0,2) + Math.pow(t1,2);
+						sumYsq += -Math.pow(o0,2) + Math.pow(o1,2);
+
+						N += 
+							(b0 ? -1 : 0) +
+							(b1 ?  1 : 0);					}
+				}
+
+				// add timeseries to correlation series
+				corrSeries[i]= corrTS;
+			}
+			drawCorrelations();
+		}
+
+		function drawCorrelations()
+		{
+			var allChunks = [];
+			for (var i=0; i<corrSeries.length; i++)
+			{
+				var series = corrSeries[i].getSeries();
+
+				// make chunks based on data availability
+				var chunk = null, chunks = [];
+				var points = [];
+				for (var j=0, N=series.length; j<=N; j++) 
+				{
+					var v = series[j];
+					if (v !== undefined && v.n > 1 && !isNaN(v.r)) 
+					{
+						if (!chunk) chunk = [];
+						chunk.push({x: v.mid, y: Math.abs(v.r)});
+					}
+					else
+					{
+						if (chunk) 
+						{
+							if (chunk.length == 1) {
+								points.push(chunk[0]);
+							}
+							else
+							{
+								chunks.push(chunk);
+							}
+							chunk = null;
+						}
+					}
+				}
+				allChunks.push(chunks);
+			}
+
+			// create chart groups
+			var group = lineChartGroup.selectAll("g.lineChart").data(allChunks);
+			group.enter().append("g")
+				.attr('class', 'lineChart');
+
+			group.attr('stroke', function(d, i) { return COLORS[i]; });
+			group.exit().remove();
+
+			var chunks = group.selectAll("path").data(function(d) { return d; });
+			chunks.enter().append('path');
+			chunks
+				.attr('d', function(d) { return pathGenerator(d); })
+			chunks.exit().remove();
+
+			// draw legend
+			var legend = legendGroup.selectAll("g.legend").data(corrVariables);
+			legend.enter().append("g")
+				.attr("class", 'legend');
+			
+			legend.attr("transform", function(d, i) { return 'translate(0,' + i*20 + ')'; });
+			legend.exit().remove();
+			var circles = legend.selectAll('circle.legendCircle').data( function(d,i) { return [COLORS[i]]; });
+			circles.enter().append("circle").attr('class', 'legendCircle').attr('cx',10).attr('cy',10).attr('r',6);
+			circles.style("fill", function(d, i) { return d; });
+			circles.exit().remove();
+
+			var text = legend.selectAll('text.legendText').data( function(d,i) { return [{text: d, index: i}]; });
+			text.enter().append("text").attr('class', 'legendText').attr('x',20).attr('y',13);
+			text
+				.on("click", function(d) 
+				{
+				 	var mouse = d3.mouse(document.body);
+					return changeVariable(d.index, mouse);
+				})
+				.attr('id', function(d) { return 'varText' + d.index; })
+				.html(function(d) { return d.text; });
+			text.exit().remove();
+		}
+
+		function changeVariable(index, mouse)
+		{
+			var selectionDiv = new ListSelection(
+				mouse[0], mouse[1], null, null,
+				ts.getFields()
+			);
+
+			(function(varIndex, selectionDiv) 
+			{
+				selectionDiv.setCallbacks(function(varName) {
+					corrVariables[varIndex] = varName;
+					updateCorrelations(varName);
+					d3.select("#varText" + varIndex).html(varName);
+				});
+			})(index, selectionDiv);
+
+		} 
+
+		function makeAxes()
+		{
+
+			var timeAxisGroup = svg.select("#timeAxisGroup");
+			if (timeAxisGroup.size() == 0) 
+			{
+				timeAxisGroup = svg.append("g")
+					.attr("id", "timeAxisGroup")
+					.attr("class", "axis")
+					.attr("transform", "translate(" + X_OFFSET + "," + (Y_OFFSET + CHART_H + 5) + ")");
+			
+			}
+
+			if (!globalTimeScale)
+			{
+				var tDomain = [ts.getStartDate(), ts.getEndDate()];
+				globalTimeScale = d3.time.scale()
+					.domain(tDomain)
+					.range([0, CHART_W]);
+			
+				var timeAxis = d3.svg.axis()
+					.scale(globalTimeScale)
+					.orient('bottom')
+					.tickFormat(d3.time.format('%m/%d'))
+					.tickSize(4);
+			}
+
+			timeAxisGroup.call(timeAxis);
+		}
+
+		function addVariable()
+		{
+			if (corrVariables.length < COLORS.length) 
+			{
+				
+				// make a random varaible
+				var fields = ts.getFields();
+				var index = Math.floor(Math.random() * fields.length);
+				var varName = fields[index];
+				corrVariables.push( varName );
+				updateCorrelations( varName );
+			}
+		}
+
+		function removeVariable()
+		{
+			if (corrVariables.length > 0) 
+			{
+				corrVariables[ corrVariables.length-1 ] = undefined;
+				corrSeries[ corrVariables.length-1 ] = undefined;
+
+				corrVariables.length--;
+				corrSeries.length--;
+
+				drawCorrelations();
+			}
+		}
+
+
+	</script>
+</body>
+</html>

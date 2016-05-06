@@ -10,6 +10,9 @@ function EcoTimeseries(urls, completeCallback)
 	this.urls = urls;
 	this.urlCount = 0;
 
+	// var cache: one dimensional series for each variable separately, cached
+	this.varCache = d3.map();
+
 	// names of data fields
 	this.fields = [];
 	this.fieldsMap = d3.map();
@@ -274,11 +277,22 @@ EcoTimeseries.prototype.getEndDate = function() {
 
 EcoTimeseries.prototype.generateOneSeries = function(varName)
 {
-	var ts = new Timeseries();
-	for (var i=0, N=this.timeseries.length; i<N; i++) {
-		ts.concat(this.timeseries[i], varName);
+	// see if we have that var in the cache
+	var ts = this.varCache.get(varName);
+	if (!ts)
+	{
+		ts = new Timeseries();
+		for (var i=0, N=this.timeseries.length; i<N; i++) {
+			ts.concat(this.timeseries[i], varName);
+		}
+		this.varCache.set(varName, ts);
 	}
 	return ts;
+}
+
+EcoTimeseries.prototype.getAllSeries = function()
+{
+	return this.timeseries;
 }
 
 

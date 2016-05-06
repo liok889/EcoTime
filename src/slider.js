@@ -12,7 +12,6 @@ var SLIDER_DRAG_EVENT = false;
 var SLIDER_HOVER_COLOR = "magenta";
 var SLIDER_DRAG_COLOR = "red";
 
-
 function RangeSlider(group, orientation, range, position, length, thickness, minLength)
 {
 	this.group = group.append("g");

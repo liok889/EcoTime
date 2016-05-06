@@ -2,6 +2,9 @@
 var SELECTION_HOVER_COLOR = "#ffd699";
 var LIST_SELECTION_OPEN = false;
 
+var DEFAULT_SELECTION_LIST_W = 150;
+var DEFUALT_SELECTION_LIST_H = 250;
+
 function ListSelection(x, y, width, height, selections)
 {
 	if (LIST_SELECTION_OPEN) {
@@ -12,8 +15,8 @@ function ListSelection(x, y, width, height, selections)
 	// create a new div element
 	this.div = d3.select("body").append("div")
 		.attr("class", "listSelectionDiv")
-		.style("width", width + "px")
-		.style("height", height + "px")
+		.style("width", (width || DEFAULT_SELECTION_LIST_W) + "px")
+		.style("height", (height || DEFUALT_SELECTION_LIST_H) + "px")
 		.style("left", x + "px")
 		.style("top", y + "px");
 
