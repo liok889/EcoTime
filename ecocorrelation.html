@@ -221,8 +221,8 @@
 		var Y_OFFSET = 40;
 		var CHART_W = 850;
 		var CHART_H = 170;
-		var COLORS = ['#66c2a5','#fc8d62','#8da0cb','#e78ac3','#a6d854','#ffd92f'].reverse();	
-
+		//var COLORS = ['#66c2a5','#fc8d62','#8da0cb','#e78ac3','#a6d854','#ffd92f'].reverse();	
+		var COLORS = ['#e41a1c','#377eb8','#4daf4a','#984ea3','#ff7f00'];
 		var pathGenerator = null;
 
 		// load the data
@@ -480,26 +480,55 @@
 			// draw legend
 			var legend = legendGroup.selectAll("g.legend").data(corrVariables);
 			legend.enter().append("g")
-				.attr("class", 'legend');
-			
+				.attr("class", 'legend')
+				.on("mouseover", function(d, i) {
+					brushVariable(d, i);
+				})
+				.on("mouseout", function() { brushVariable(); })	;
+
 			legend.attr("transform", function(d, i) { return 'translate(0,' + i*20 + ')'; });
 			legend.exit().remove();
+			
 			var circles = legend.selectAll('circle.legendCircle').data( function(d,i) { return [COLORS[i]]; });
 			circles.enter().append("circle").attr('class', 'legendCircle').attr('cx',10).attr('cy',10).attr('r',6);
 			circles.style("fill", function(d, i) { return d; });
 			circles.exit().remove();
 
-			var text = legend.selectAll('text.legendText').data( function(d,i) { return [{text: d, index: i}]; });
+			var text = legend.selectAll('text.legendText').data( function(d,i) { return [{varName: d, text: d, index: i}]; });
 			text.enter().append("text").attr('class', 'legendText').attr('x',20).attr('y',13);
 			text
 				.on("click", function(d) 
 				{
 				 	var mouse = d3.mouse(document.body);
-					return changeVariable(d.index, mouse);
+					changeVariable(d.index, mouse);
 				})
 				.attr('id', function(d) { return 'varText' + d.index; })
 				.html(function(d) { return d.text; });
 			text.exit().remove();
+		}
+
+		function brushVariable(varName, index)
+		{
+			// brush All related variables
+			if (varName)
+			{
+				(function(varName, index) {
+					svg.selectAll("g.lineChart").each(function(d, i) {
+						d3.select(this)
+							.style("stroke-opacity", i==index ? 1.0 : 0.25)
+							.style("stroke-width", i==index ? '' : '1px');
+					});
+				})(varName, index)
+			}
+			else
+			{
+				svg.selectAll('g.lineChart').each(function(d, i) 
+				{
+					d3.select(this)
+						.style("stroke-opacity", '')
+						.style("stroke-width", '');
+				});
+			}
 		}
 
 		function changeVariable(index, mouse)
