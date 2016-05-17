@@ -140,6 +140,16 @@
 			user-select: none;
 			cursor: default;
 		}
+
+		.visArea {
+			position: absolute;
+			top: 30px;
+			left: 10px;
+		}
+
+		.divOverlay {
+			pointer-events: none;
+		}
 	</style>
 </head>
 
@@ -150,7 +160,9 @@
 		<input id="checkShowPoints" type="checkbox" onclick="scatterVisibility()">Show points &nbsp;
 		<input id="checkShowConnected" type="checkbox" onclick="scatterVisibility()">Show lines
 	</div>
-	<svg id="mainSVG" width="1000" height="1000" border="solid 1px black"></svg>
+	<svg id="mainSVG" width="1000" height="1000" class="visArea" style="border: solid 1px #dddddd"></svg>
+	<div id="canvasDIV" class="visArea" style="width: 1000px; height: 1000px; pointer-events: none; z-index: 300"></div>
+
 
 	<script type="text/javascript">
 
@@ -160,6 +172,10 @@
 		var X_SCATTER_OFFSET = X_TIME_OFFSET + 50;
 		var Y_SCATTER_OFFSET = 0;
 		var TIME_AXIS_HEIGHT = 500;
+		var CANVAS_ID = 0;
+
+		// canvas div
+		var canvasDIV = d3.select("#canvasDIV");
 
 		// the SVG
 		var svg = d3.select("#mainSVG");
@@ -171,7 +187,6 @@
 		var ts = new EcoTimeseries(
 			[
 				'data/indices_mid-day_avg_prep_02-21-2016g_flagExcluded.csv',
-//				'data/indices_02-21-2016g.csv',
 				'data/EcoSpec_Summer_2015_GPP_Reco_data_new_DOY-shifted.csv',
 				'data/Decagon_NDVI_&_PRI_02-27-2017_30min.csv'
 			],
@@ -234,11 +249,11 @@
 
 			// create group for the scatterplot row
 			var scatterGroup = svg.append("g")
-				.attr("transform", "translate(" + scatterX + "," + scatterY + ")");
+				.attr("transform", "translate(" + 0 + "," + 0 + ")");
 
 			// add the scatterplot row
 			var timeRange = timeRangeFromNormalized(slider.getNormalizedRange());
-			var row = new ScatterplotRow(scatterGroup, 'fc', ['PRIsn', 'LE', 'VPD', 'Tsoil', 'fc'], 0, 0, timeRange);
+			var row = new ScatterplotRow(scatterGroup, 'fc', ['PRIsn', 'LE', 'VPD', 'Tsoil', 'fc'], scatterX, scatterY, timeRange);
 			scatterRows.push(row);
 
 			// create slider callback
@@ -250,6 +265,30 @@
 					scatterRow.setTimeRange( timeRange );
 				});
 			})(row, slider)
+
+			/*
+			if (canvasDIV && N==0) {
+				globalAnimate();
+			}
+			*/
+		}
+
+		function globalAnimate()
+		{
+			var currentTime = (new Date()).getTime();
+			var deltaTime = lastAnimTime !== undefined ? 0.001 : (currentTime-lastAnimTime)/1000;
+			lastAnimTime = currentTime;
+
+			// loop through all scatterplot rows and animate their plots
+			for (var i=0; i<scatterRows.length; i++) 
+			{
+				var row = scatterRows[i];
+				var scatterplots = row.getScatterplots();
+				for (var j=0; j<scatterplots.length; j++) {
+					scatterplots[j].animate(deltaTime);
+				}
+			}
+			window.requestAnimationFrame(globalAnimate);
 		}
 
 		function removeScatter()
