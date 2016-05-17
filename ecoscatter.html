@@ -150,6 +150,10 @@
 		.divOverlay {
 			pointer-events: none;
 		}
+
+		.scatterCanvas {
+			position: absolute;
+		}
 	</style>
 </head>
 
@@ -161,7 +165,7 @@
 		<input id="checkShowConnected" type="checkbox" onclick="scatterVisibility()">Show lines
 	</div>
 	<svg id="mainSVG" width="1000" height="1000" class="visArea" style="border: solid 1px #dddddd"></svg>
-	<div id="canvasDIV" class="visArea" style="width: 1000px; height: 1000px; pointer-events: none; z-index: 300"></div>
+	<div id="canvasDIV" class="visArea" style="width: 1000px; height: 1000px; pointer-events: none; z-index: 10"></div>
 
 
 	<script type="text/javascript">
@@ -253,7 +257,7 @@
 
 			// add the scatterplot row
 			var timeRange = timeRangeFromNormalized(slider.getNormalizedRange());
-			var row = new ScatterplotRow(scatterGroup, 'fc', ['PRIsn', 'LE', 'VPD', 'Tsoil', 'fc'], scatterX, scatterY, timeRange);
+			var row = new ScatterplotRow(scatterGroup, 'fc', ['Tsoil', 'PRIsn', 'LE', 'VPD', 'Tsoil', 'fc'], scatterX, scatterY, timeRange);
 			scatterRows.push(row);
 
 			// create slider callback
@@ -266,17 +270,18 @@
 				});
 			})(row, slider)
 
-			/*
+			
 			if (canvasDIV && N==0) {
 				globalAnimate();
 			}
-			*/
+			
 		}
 
+		var lastAnimTime = undefined;
 		function globalAnimate()
 		{
 			var currentTime = (new Date()).getTime();
-			var deltaTime = lastAnimTime !== undefined ? 0.001 : (currentTime-lastAnimTime)/1000;
+			var deltaTime = lastAnimTime === undefined ? 0.001 : (currentTime-lastAnimTime)/1000;
 			lastAnimTime = currentTime;
 
 			// loop through all scatterplot rows and animate their plots
