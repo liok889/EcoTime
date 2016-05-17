@@ -163,9 +163,11 @@
 		<button onclick="removeScatter()">&nbsp;-&nbsp;</button>&nbsp;
 		<input id="checkShowPoints" type="checkbox" onclick="scatterVisibility()">Show points &nbsp;
 		<input id="checkShowConnected" type="checkbox" onclick="scatterVisibility()">Show lines
+		<input id="checkShowAnimation" type="checkbox" onclick="scatterVisibility()">Particles animation
+
 	</div>
-	<svg id="mainSVG" width="1000" height="1000" class="visArea" style="border: solid 1px #dddddd"></svg>
-	<div id="canvasDIV" class="visArea" style="width: 1000px; height: 1000px; pointer-events: none; z-index: 10"></div>
+	<svg id="mainSVG" width="1100" height="1100" class="visArea"></svg>
+	<div id="canvasDIV" class="visArea" style="width: 1100px; height: 1100px; pointer-events: none; z-index: 10"></div>
 
 
 	<script type="text/javascript">
@@ -257,7 +259,7 @@
 
 			// add the scatterplot row
 			var timeRange = timeRangeFromNormalized(slider.getNormalizedRange());
-			var row = new ScatterplotRow(scatterGroup, 'fc', ['Tsoil', 'PRIsn', 'LE', 'VPD', 'Tsoil', 'fc'], scatterX, scatterY, timeRange);
+			var row = new ScatterplotRow(scatterGroup, 'fc', ['Tsoil', 'PRIsn', 'LE', 'VPD', 'Tsoil'], scatterX, scatterY, timeRange);
 			scatterRows.push(row);
 
 			// create slider callback
@@ -311,6 +313,8 @@
 		{
 			POINT_VISIBILITY = d3.select("#checkShowPoints").node().checked;
 			CONNECTED_VISIBILITY = d3.select("#checkShowConnected").node().checked;
+			ANIMATION_VISIBILITY = d3.select("#checkShowAnimation").node().checked;
+
 			toggleScatterElementVisibility();
 		}
 
@@ -318,6 +322,8 @@
 		{
 			d3.select("#checkShowPoints").node().checked = POINT_VISIBILITY;
 			d3.select("#checkShowConnected").node().checked = CONNECTED_VISIBILITY;
+			d3.select("#checkShowAnimation").node().checked = ANIMATION_VISIBILITY;
+				
 		}
 	</script>
 </body>

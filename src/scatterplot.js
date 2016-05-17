@@ -21,18 +21,19 @@ var SCATTER_CIRCLE_RADIUS = 2;
 // controls visibility of points / connection lines
 var POINT_VISIBILITY = true;
 var CONNECTED_VISIBILITY = false;
+var ANIMATION_VISIBILITY = false;
 
 // map for all scatterplots
 var SCATTER_COUNTER = 0;
 var scatterMap = d3.map();
 
 // streamline paramters
-var PARTICLE_AGE = 6;			// in seconds
+var PARTICLE_AGE = 3;			// in seconds
 var PARTICLE_SPEED = 2.0;		// in t/second
 var PARTICLE_TRAIL = 30;		// length of trail (for each particle)
-var PARTICLE_MAX_COUNT = 1;	// max number of particles
-var PARTICLE_SPAWN_TIME = 0.2;	// spawn particles every X seconds
-var PARTICLE_SPAWN_COUNT = 30;	// max number of particles to spawn
+var PARTICLE_MAX_COUNT = 70;	// max number of particles
+var PARTICLE_SPAWN_TIME = 0.08;	// spawn particles every X seconds
+var PARTICLE_SPAWN_COUNT = 10;	// max number of particles to spawn
 
 function Scatterplot(group, width, height, ySeries, xSeries, timeRange, xOffset, yOffset)
 {
@@ -98,6 +99,14 @@ function Scatterplot(group, width, height, ySeries, xSeries, timeRange, xOffset,
 	}
 }
 
+Scatterplot.prototype.clearAnimation = function() 
+{
+	if (this.canvas) 
+	{
+		this.canvas.node().getContext('2d').clearRect(0,0, this.w-SCATTER_PAD_W*2, this.h-SCATTER_PAD_H*2);
+	}
+}
+
 function catmull_rom(p0, p1, p2, p3, t)
 {			
 	var t2 = Math.pow(t,2);
@@ -142,8 +151,6 @@ Scatterplot.prototype.moveParticles = function(deltaTime)
 				part.t = part.t % 1;
 				part.i++;
 			}
-			//console.log("age: " + part.age + ", i: " + part.i + ", t: " + part.t + ", dTime: " + deltaTime);
-
 		}
 		else
 		{
@@ -157,26 +164,29 @@ Scatterplot.prototype.moveParticles = function(deltaTime)
 Scatterplot.prototype.animate = function(deltaTime)
 {
 	// schedule particle spawning
-	if (!this.particleSpawn) {
-		this.particleSpawn = randomSpawn();
-	}
-	else
+	if (ANIMATION_VISIBILITY)
 	{
-		this.particleSpawn.time -= deltaTime;
-		if (this.particleSpawn.time <= 0) 
-		{
-			var created = 0;
-			for (var i=0, N=this.particleSpawn.count; i<N; i++) 
-			{
-				if (!this.spawnParticle()) {
-					break;
-				}
-				else {
-					created++;
-				}
-			}
-			//console.log("spawned " + created + " particles. total particles: " + this.particles.length);
+		if (!this.particleSpawn) {
 			this.particleSpawn = randomSpawn();
+		}
+		else
+		{
+			this.particleSpawn.time -= deltaTime;
+			if (this.particleSpawn.time <= 0) 
+			{
+				var created = 0;
+				for (var i=0, N=this.particleSpawn.count; i<N; i++) 
+				{
+					if (!this.spawnParticle()) {
+						break;
+					}
+					else {
+						created++;
+					}
+				}
+				//console.log("spawned " + created + " particles. total particles: " + this.particles.length);
+				this.particleSpawn = randomSpawn();
+			}
 		}
 	}
 
@@ -189,7 +199,7 @@ Scatterplot.prototype.animate = function(deltaTime)
 	function randomSpawn()
 	{
 		return {
-			time: PARTICLE_SPAWN_TIME + (Math.random() > 0.5 ? 1 : -1) * Math.random() * (PARTICLE_SPAWN_TIME/3),
+			time: PARTICLE_SPAWN_TIME + (Math.random() > 0.5 ? 1 : -1) * Math.random() * (PARTICLE_SPAWN_TIME/1.5),
 			count: Math.floor((1+PARTICLE_SPAWN_COUNT) * Math.random())
 		};
 	}
@@ -218,8 +228,8 @@ Scatterplot.prototype.drawParticles = function()
 		var p1 = part.position;
 		var gapCount = 0, jump = false;;
 
+		context.beginPath();
 		if (p1) {
-			context.beginPath();
 			context.moveTo(xScale(p1.x), yScale(p1.y));
 		}
 
@@ -228,13 +238,19 @@ Scatterplot.prototype.drawParticles = function()
 			var p2 = trail[i];
 			if (p1 && p2) 
 			{
+				/*
 				if (jump) 
 				{
 					context.moveTo(xScale(p1.x), yScale(p1.y));
 					jump = false;
 				}
-				//context.strokeStyle('rgba(0.0, 0.0, 0.0, ' + ((i+1)/PARTICLE_TRAIL) + ')');
+				*/
+				var strokeStyle = 'rgba(0, 0, 0, ' + ((i+1) / Math.min(PARTICLE_TRAIL, trail.length)).toFixed(2) + ')';			
+				context.strokeStyle = strokeStyle;
+				context.beginPath();
+				context.moveTo(xScale(p1.x), yScale(p1.y));
 				context.lineTo(xScale(p2.x), yScale(p2.y));
+				context.stroke();
 				drawCount++;
 			}
 			else {
@@ -243,9 +259,7 @@ Scatterplot.prototype.drawParticles = function()
 			}
 			p1=p2;
 		}
-		if (drawCount > 0) {
-			context.stroke();
-		}
+		context.stroke();
 
 		if (gapCount >= PARTICLE_TRAIL) {
 			// kill particle
@@ -315,7 +329,7 @@ Scatterplot.prototype.spawnParticle = function()
 
 		// create particle
 		var newParticle = {
-			age: PARTICLE_AGE,
+			age: PARTICLE_AGE - Math.random() * PARTICLE_AGE/3,
 			i: i,
 			t: t,
 			timestep: this.scatterPoints[i].timestep,
@@ -337,6 +351,9 @@ Scatterplot.prototype.toggleElementVisibility = function()
 {
 	this.pointGroup.attr("visibility", POINT_VISIBILITY ? "visible" : "hidden");
 	this.lineGroup.attr("visibility", CONNECTED_VISIBILITY ? "visible" : "hidden");	
+	if (!ANIMATION_VISIBILITY) {
+		this.clearAnimation();
+	}
 }
 
 Scatterplot.prototype.setXSeries = function(xSeries, varName)
