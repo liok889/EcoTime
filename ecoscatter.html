@@ -75,7 +75,7 @@
 		{
 			stroke: #ffad33;
 			stroke-width: 1px;
-			stroke-opacity: 0.5;
+			stroke-opacity: 0.4;
 			fill: none;
 		}
 
@@ -274,28 +274,39 @@
 
 			
 			if (canvasDIV && N==0) {
-				globalAnimate();
+				if (animationFrame === null) {
+					globalAnimate();
+				}
 			}
 			
 		}
 
-		var lastAnimTime = undefined;
+		var lastAnimTime = null;
+		var animationFrame = null;
+
 		function globalAnimate()
 		{
+			// clear animation callback
+			animationFrame = null;
+
+			// calculate delta time
 			var currentTime = (new Date()).getTime();
-			var deltaTime = lastAnimTime === undefined ? 0.001 : (currentTime-lastAnimTime)/1000;
+			var deltaTime = lastAnimTime === null ? 0.001 : (currentTime-lastAnimTime)/1000;
 			lastAnimTime = currentTime;
 
 			// loop through all scatterplot rows and animate their plots
+			var hasParticles = false;
 			for (var i=0; i<scatterRows.length; i++) 
 			{
 				var row = scatterRows[i];
 				var scatterplots = row.getScatterplots();
 				for (var j=0; j<scatterplots.length; j++) {
-					scatterplots[j].animate(deltaTime);
+					hasParticles |= scatterplots[j].animate(deltaTime);
 				}
 			}
-			window.requestAnimationFrame(globalAnimate);
+			if (hasParticles) {
+				animationFrame = window.requestAnimationFrame(globalAnimate);
+			}
 		}
 
 		function removeScatter()
@@ -314,6 +325,9 @@
 			POINT_VISIBILITY = d3.select("#checkShowPoints").node().checked;
 			CONNECTED_VISIBILITY = d3.select("#checkShowConnected").node().checked;
 			ANIMATION_VISIBILITY = d3.select("#checkShowAnimation").node().checked;
+			if (ANIMATION_VISIBILITY && animationFrame === null) {
+				globalAnimate();
+			}
 
 			toggleScatterElementVisibility();
 		}

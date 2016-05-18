@@ -28,12 +28,14 @@ var SCATTER_COUNTER = 0;
 var scatterMap = d3.map();
 
 // streamline paramters
-var PARTICLE_AGE = 3;			// in seconds
+var PARTICLE_AGE = 4;			// in seconds
 var PARTICLE_SPEED = 2.0;		// in t/second
-var PARTICLE_TRAIL = 30;		// length of trail (for each particle)
-var PARTICLE_MAX_COUNT = 70;	// max number of particles
+var PARTICLE_TRAIL = 40;		// length of trail (for each particle)
+var PARTICLE_MAX_COUNT = 30;	// max number of particles
 var PARTICLE_SPAWN_TIME = 0.08;	// spawn particles every X seconds
 var PARTICLE_SPAWN_COUNT = 10;	// max number of particles to spawn
+var PARTICLE_MAX_OPACITY = 0.5;
+var PARTICLE_TRAIL_WIDTH = 1;
 
 function Scatterplot(group, width, height, ySeries, xSeries, timeRange, xOffset, yOffset)
 {
@@ -84,26 +86,27 @@ function Scatterplot(group, width, height, ySeries, xSeries, timeRange, xOffset,
 
 	if (canvasDIV)
 	{
-		// create a canvas on top
+		var canvasW = this.w, canvasH = this.h;
+		if (window.devicePixelRatio) {
+			canvasW *= window.devicePixelRatio;
+			canvasH *= window.devicePixelRatio;
+			this.canvasScale = window.devicePixelRatio;
+		}
+
+		// create a canvas
 		var contentOffset = this.getContentOffset();
 		this.canvas = canvasDIV.append("canvas")
 			.attr("class", "scatterCanvas")
 			.attr("id", "canvas" + this.id)
-			.attr("width", this.w - SCATTER_PAD_W*2)
-			.attr("height", this.h - SCATTER_PAD_H*2)
-			.style("left", (contentOffset[0] + SCATTER_PAD_W) + "px")
-			.style("top", (contentOffset[1] + SCATTER_PAD_H) + "px");
+			.attr("width", canvasW)
+			.attr("height", canvasH)
+			.style("width", this.w + "px")
+			.style("height", this.h + "px")
+			.style("left", contentOffset[0] + "px")
+			.style("top", contentOffset[1] + "px");
 
 		// create an array for particles
 		this.particles = [];
-	}
-}
-
-Scatterplot.prototype.clearAnimation = function() 
-{
-	if (this.canvas) 
-	{
-		this.canvas.node().getContext('2d').clearRect(0,0, this.w-SCATTER_PAD_W*2, this.h-SCATTER_PAD_H*2);
 	}
 }
 
@@ -189,12 +192,19 @@ Scatterplot.prototype.animate = function(deltaTime)
 			}
 		}
 	}
+	else
+	{
+		this.particleSpawn = undefined;
+	}
 
 	// move particles
 	this.moveParticles(deltaTime);
 
 	// draw them
 	this.drawParticles();
+
+	// return true if has at least one particle
+	return this.particles.length > 0 || this.particleSpawn !== undefined;
 
 	function randomSpawn()
 	{
@@ -209,62 +219,57 @@ Scatterplot.prototype.drawParticles = function()
 {
 	var xScale = this.getXScale();
 	var yScale = this.getYScale();
-	var context = this.canvas.node().getContext("2d");
 	var particles = this.particles;
+
+	// canvas propeties
+	var scale = this.canvasScale;
+	var context = this.canvas.node().getContext("2d");
 	
 
 	// clear the canvas
-	context.clearRect(0, 0, this.w-SCATTER_PAD_W*2, this.h-SCATTER_PAD_H*2);
+	context.clearRect(0, 0, scale*this.w, scale*this.h);
 
 	// set line width / color
-	context.lineWidth = 1;
-	context.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+	context.lineWidth = PARTICLE_TRAIL_WIDTH * scale;
 
-	var drawCount = 0, killCount = 0;
 	for (var k=0; k<particles.length; k++) 
 	{
 		var part = particles[k];
 		var trail = part.trail;
-		var p1 = part.position;
-		var gapCount = 0, jump = false;;
+		var p1 = part.position, pp1 = null;
+		var gapCount = 0, jump = false;
 
-		context.beginPath();
 		if (p1) {
-			context.moveTo(xScale(p1.x), yScale(p1.y));
+			pp1 = {x: xScale(p1.x)+SCATTER_PAD_W, y: yScale(p1.y)+SCATTER_PAD_H };
 		}
 
-		for (var i=trail.length-1; i>=0; i--) 
+		for (var j=0, i=trail.length-1; i>=0; i--, j++) 
 		{
 			var p2 = trail[i];
-			if (p1 && p2) 
+			var pp2 = p2 ? { x: xScale(p2.x)+SCATTER_PAD_W, y: yScale(p2.y)+SCATTER_PAD_H } : null
+			if (pp1 && pp2) 
 			{
-				/*
-				if (jump) 
-				{
-					context.moveTo(xScale(p1.x), yScale(p1.y));
-					jump = false;
-				}
-				*/
-				var strokeStyle = 'rgba(0, 0, 0, ' + ((i+1) / Math.min(PARTICLE_TRAIL, trail.length)).toFixed(2) + ')';			
-				context.strokeStyle = strokeStyle;
+				var alpha = (PARTICLE_TRAIL-j) / PARTICLE_TRAIL;
+				alpha *= PARTICLE_MAX_OPACITY;
+				
+				context.strokeStyle = 'rgba(204, 0, 0, ' + alpha + ')';	;
 				context.beginPath();
-				context.moveTo(xScale(p1.x), yScale(p1.y));
-				context.lineTo(xScale(p2.x), yScale(p2.y));
+				context.moveTo(scale * pp1.x, scale * pp1.y);
+				context.lineTo(scale * pp2.x, scale * pp2.y);
 				context.stroke();
-				drawCount++;
 			}
-			else {
-				jump = true;
+			else
+			{
 				gapCount++;
 			}
-			p1=p2;
-		}
-		context.stroke();
 
-		if (gapCount >= PARTICLE_TRAIL) {
+			pp1 = pp2;
+		}
+
+		if (gapCount >= PARTICLE_TRAIL) 
+		{
 			// kill particle
-			var K = particles.splice(k, 1);
-			killCount++;
+			particles.splice(k, 1); k--;
 		}
 	}
 
@@ -329,7 +334,7 @@ Scatterplot.prototype.spawnParticle = function()
 
 		// create particle
 		var newParticle = {
-			age: PARTICLE_AGE - Math.random() * PARTICLE_AGE/3,
+			age: PARTICLE_AGE + (Math.random() > 0.5 ? 1 : -1) * (Math.random() * PARTICLE_AGE/2),
 			i: i,
 			t: t,
 			timestep: this.scatterPoints[i].timestep,
@@ -351,9 +356,6 @@ Scatterplot.prototype.toggleElementVisibility = function()
 {
 	this.pointGroup.attr("visibility", POINT_VISIBILITY ? "visible" : "hidden");
 	this.lineGroup.attr("visibility", CONNECTED_VISIBILITY ? "visible" : "hidden");	
-	if (!ANIMATION_VISIBILITY) {
-		this.clearAnimation();
-	}
 }
 
 Scatterplot.prototype.setXSeries = function(xSeries, varName)

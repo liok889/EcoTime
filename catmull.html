@@ -1,0 +1,103 @@
+<html>
+<head>
+	<title>Catmull-Rom test</title>
+	<!-- code delivery network -->
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.6/d3.min.js" charset="utf-8"></script>
+	<style>
+		.point {
+			fill: #ff8080;
+			stroke: none;
+		}
+		.segment {
+			stroke: #002db3;
+			stroke-width: 1.5px;
+			fill: none;
+		}
+	</style>
+</head>
+<body>
+
+	<svg id="svgMain" width="700" height="800" style="border: solid 1px #cccccc"></svg>
+
+	<script type="text/javascript">
+		
+		var points = [];
+		var segments = [];
+
+		var svg = d3.select("#svgMain");
+		var SEG_DENSITY = 4;	// on segment every 4 pixels
+
+		svg.on("dblclick", function() 
+		{
+			var mouse = d3.mouse(this);
+			console.log("mouse:" + mouse);
+			
+			// add a point
+			points.push({x: mouse[0], y: mouse[1]});
+
+			// create segments
+			for (var i=1, N=points.length-2; i<N; i++) 
+			{
+				var p0 = points[i-1];
+				var p1 = points[i  ];
+				var p2 = points[i+1];
+				var p3 = points[i+2];
+					
+				var segmentLen = Math.sqrt(Math.pow(p1.x-p2.x, 2) + Math.pow(p1.y-p2.y, 2));
+				var count = Math.ceil(segmentLen / SEG_DENSITY);
+
+				var segment = segments[i];
+				if (!segment)
+				{
+					segment = [];
+					for (var j=0, M=count-1; j<=M; j++) 
+					{
+						var t = j/M;
+						var t2 = t*t;
+						var t3 = t*t2;
+						var x = 0.5 *(  	
+							(2 * p1.x) +
+ 							(-p0.x + p2.x) * t +
+							(2*p0.x - 5*p1.x + 4*p2.x - p3.x) * t2 +
+							(-p0.x + 3*p1.x- 3*p2.x + p3.x) * t3
+						);
+						var y = 0.5 *(  	
+							(2 * p1.y) +
+ 							(-p0.y + p2.y) * t +
+							(2*p0.y - 5*p1.y + 4*p2.y - p3.y) * t2 +
+							(-p0.y + 3*p1.y- 3*p2.y + p3.y) * t3
+						);
+						segment.push({x: x, y: y});
+					}
+					segments[i] = segment;
+				}
+			}
+			segments.length = Math.max(0, points.length-2);
+
+			// draw points and segments
+			draw();
+		});
+
+		var pathGenerator = d3.svg.line()
+			.x(function(d) { return d.x; })
+			.y(function(d) { return d.y; });
+
+		function draw()
+		{
+			// bind
+			svg.selectAll("circle.point").data(points).enter().append("circle")
+				.attr("class", "point")
+				.attr("r", "7px")
+				.attr("cx", function(d) { return d.x; }).attr("cy", function(d) { return d.y; });
+	
+			// bind segments
+			var newGroups = svg.selectAll("path.segment").data(segments);
+			newGroups.enter().append("path")
+				.attr("d", function(d) { return d === null || d === undefined ? "" : pathGenerator(d); })
+				.attr("class", "segment");
+			
+
+		}
+	</script>
+</body>
+</html>
