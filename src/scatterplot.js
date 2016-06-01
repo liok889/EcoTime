@@ -784,11 +784,13 @@ Scatterplot.prototype.enableGlobalScale = function(enabled)
 Scatterplot.prototype.setYRange = function(scale2)
 {
 	this.rowScale2 = scale2 ? d3.scale.linear().domain(scale2).range([this.h-SCATTER_PAD_H*2, 0]) : undefined;
-
+	this.updateGraphics();
+	/*
 	// update graphics rendering
 	if (this.globalScale) {
 		this.updateGraphics();
 	}
+	*/
 }
 
 
