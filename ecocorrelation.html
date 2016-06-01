@@ -319,7 +319,7 @@
 
 			slider.setFixedPosition(true);
 			slider.setCallback(function(nRange) {
-				var n = (nRange[1]/4) * (ts.getTimeLength()-1);
+				var n = (nRange[1]/8) * (ts.getTimeLength()-1);
 				timeWindow = Math.floor(n);
 				//console.log("time window: " + timeWindow)
 				updateCorrelations();

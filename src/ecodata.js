@@ -275,6 +275,12 @@ EcoTimeseries.prototype.getEndDate = function() {
 	return new Date(this.endDate + 24*60*60*1000);
 }
 
+EcoTimeseries.prototype.getTimestepOffset = function() 
+{
+	return INCREMENT_MINUTE * 60 * 1000;
+}
+
+
 EcoTimeseries.prototype.generateOneSeries = function(varName)
 {
 	// see if we have that var in the cache

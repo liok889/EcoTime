@@ -22,6 +22,7 @@ var SCATTER_CIRCLE_RADIUS = 2;
 var POINT_VISIBILITY = true;
 var CONNECTED_VISIBILITY = false;
 var ANIMATION_VISIBILITY = false;
+var GLOBAL_SCALE = false;
 
 // map for all scatterplots
 var SCATTER_COUNTER = 0;
@@ -32,9 +33,9 @@ var PARTICLE_AGE = 4;			// in seconds
 var PARTICLE_SPEED = 2.0;		// in t/second
 var PARTICLE_TRAIL = 40;		// length of trail (for each particle)
 var PARTICLE_MAX_COUNT = 30;	// max number of particles
-var PARTICLE_SPAWN_TIME = 0.08;	// spawn particles every X seconds
+var PARTICLE_SPAWN_TIME = 0.02;	// spawn particles every X seconds
 var PARTICLE_SPAWN_COUNT = 10;	// max number of particles to spawn
-var PARTICLE_MAX_OPACITY = 0.5;
+var PARTICLE_MAX_OPACITY = 0.3;
 var PARTICLE_TRAIL_WIDTH = 1;
 
 function Scatterplot(group, width, height, ySeries, xSeries, timeRange, xOffset, yOffset)
@@ -57,7 +58,7 @@ function Scatterplot(group, width, height, ySeries, xSeries, timeRange, xOffset,
 	this.xSeries = xSeries;		// goes to Y axis
 	this.ySeries = ySeries;		// goes to X axis
 
-	this.globalScale = false;
+	this.globalScale = GLOBAL_SCALE;
 	this.timeRange = timeRange || [0, ySeries.size()-1];
 
 	// create groups and the various scatterplot elements
@@ -81,9 +82,6 @@ function Scatterplot(group, width, height, ySeries, xSeries, timeRange, xOffset,
 	
 	this.textGroup = this.group.append("g");
 
-	// update & draw static scatterplot elements
-	this.update();
-
 	if (canvasDIV)
 	{
 		var canvasW = this.w, canvasH = this.h;
@@ -92,6 +90,8 @@ function Scatterplot(group, width, height, ySeries, xSeries, timeRange, xOffset,
 			canvasH *= window.devicePixelRatio;
 			this.canvasScale = window.devicePixelRatio;
 		}
+		this.canvasW = canvasW;
+		this.canvasH = canvasH;
 
 		// create a canvas
 		var contentOffset = this.getContentOffset();
@@ -105,9 +105,30 @@ function Scatterplot(group, width, height, ySeries, xSeries, timeRange, xOffset,
 			.style("left", contentOffset[0] + "px")
 			.style("top", contentOffset[1] + "px");
 
+		// get WebGL context for the canvas
+		this.gl = initWebGL(this.canvas.node());
+
 		// create an array for particles
 		this.particles = [];
 	}
+
+	// update & draw static scatterplot elements
+	this.update();
+}
+
+function initWebGL(canvas)
+{
+	var gl = null;
+	try {
+		gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+	}
+	catch(e) {}
+
+	if (!gl) {
+		alert("Unable to initialize WebGL. Your browser may not support it.");
+		gl = null;
+	}
+	return gl;
 }
 
 function catmull_rom(p0, p1, p2, p3, t)
@@ -130,13 +151,18 @@ function catmull_rom(p0, p1, p2, p3, t)
 	return {x: x, y: y};
 }
 
+Scatterplot.prototype.makeVertexBuffer = function()
+{
+
+}
+
 Scatterplot.prototype.moveParticles = function(deltaTime)
 {
 	var points = this.scatterPoints;
 	var particles = this.particles;
 
 	// move particles to the next point
-	for (var k=0; k<particles.length; k++) 
+	for (var k=0, N=particles.length; k<N; k++) 
 	{
 		var part = particles[k];
 			
@@ -187,7 +213,6 @@ Scatterplot.prototype.animate = function(deltaTime)
 						created++;
 					}
 				}
-				//console.log("spawned " + created + " particles. total particles: " + this.particles.length);
 				this.particleSpawn = randomSpawn();
 			}
 		}
@@ -224,6 +249,9 @@ Scatterplot.prototype.drawParticles = function()
 	// canvas propeties
 	var scale = this.canvasScale;
 	var context = this.canvas.node().getContext("2d");
+	if (!context) {
+		return;
+	}
 	
 
 	// clear the canvas
@@ -272,8 +300,6 @@ Scatterplot.prototype.drawParticles = function()
 			particles.splice(k, 1); k--;
 		}
 	}
-
-	//console.log("drawCount: " + drawCount + ", killCount: " + killCount);
 }
 
 Scatterplot.prototype.advanceParticlePosition = function(part)
@@ -356,6 +382,14 @@ Scatterplot.prototype.toggleElementVisibility = function()
 {
 	this.pointGroup.attr("visibility", POINT_VISIBILITY ? "visible" : "hidden");
 	this.lineGroup.attr("visibility", CONNECTED_VISIBILITY ? "visible" : "hidden");	
+	if (CONNECTED_VISIBILITY) 
+	{
+		this.drawGL();
+	}
+	else
+	{
+		this.clearGL();
+	}
 }
 
 Scatterplot.prototype.setXSeries = function(xSeries, varName)
@@ -386,6 +420,203 @@ Scatterplot.prototype.getLocalYDomain = function()
 {
 	return this.localScale2.domain();
 }
+
+Scatterplot.prototype.updateGLData = function()
+{
+	
+	var COLOR_SCALE = [
+		[178,24,43],
+		[178,24,43],
+		[239,138,98],
+		[100, 100, 100],
+		[103,169,207],
+		[33,102,172],
+		[33,102,172]
+
+	].reverse();
+	
+	/*
+	var COLOR_SCALE = [
+		[252,187,161],
+		[252,146,114],
+		[251,106,74],
+		[239,59,44],
+		[203,24,29],
+		[153,0,13]
+	];
+	*/
+
+	var colorScale = d3.scale.quantize().domain([0, 1]).range(d3.range(COLOR_SCALE.length));
+
+	// create vertex array if we have an OpenGL context
+	var gl = this.gl;
+	if (gl) 
+	{
+
+		// delete old buffer if exist
+		if (this.vertexBuffer !== undefined) { 
+			gl.deleteBuffer(this.vertexBuffer); 
+			this.vertexBuffer = undefined; 
+		}
+		if (this.colorBuffer !== undefined) {
+			gl.deleteBuffer(this.colorBuffer);
+			this.colorBuffer = undefined;
+		}
+		
+		// create arrays for vertices and colors
+		var xSeries = this.xSeries.getSeries();
+		var ySeries = this.ySeries.getSeries();
+		var N = Math.min(xSeries.length, ySeries.length);
+
+		// scales
+		var xScale = this.getXScale();
+		var yScale = this.getYScale();
+
+		// begining / end timestep
+		var beginTime = ts.getStartDate().getTime();
+		var timestepOffset = ts.getTimestepOffset();
+
+		var vertices = [], colors = [], indices = [];
+		var vertexCount = 0;
+		var lastIndex = -1;
+
+		for (var i=0; i<N; i++) 
+		{
+			var v1 = xSeries[i]; var b1 = v1 !== null && v1 !== undefined;
+			var v2 = ySeries[i]; var b2 = v2 !== null && v2 !== undefined;
+			
+			if (b1 && b2)  
+			{
+				vertices.push( xScale(v1) );
+				vertices.push( yScale(v2) );		
+			
+				// determine color based on the time of the day
+				var timestep = new Date(beginTime + i*timestepOffset);
+				var dayOffset = timestep.getHours() * 60*60*1000 + timestep.getMinutes() * 60*1000;
+				var dayOffsetN = dayOffset / (24*60*60*1000-1);
+				
+				// map to color
+				var color = COLOR_SCALE[colorScale(dayOffsetN)];
+
+				colors.push( color[0]/255 );
+				colors.push( color[1]/255 );
+				colors.push( color[2]/255 );
+				colors.push(      1.0     );
+			
+				indices.push(vertexCount);
+				lastIndex = vertexCount;
+				vertexCount++;
+			}
+			else
+			{
+				indices.push(lastIndex);
+			}
+		}
+		this.vertexIndices = indices;
+
+		// create buffers and upload vertices
+		this.vertexBuffer = gl.createBuffer();
+		gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
+		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+
+		this.colorBuffer = gl.createBuffer();
+		gl.bindBuffer(gl.ARRAY_BUFFER, this.colorBuffer);
+		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
+
+		this.vertexCount = vertexCount;
+	}
+}
+Scatterplot.prototype.clearGL = function()
+{
+	var gl = this.gl;
+	if (gl) {
+		gl.clear(gl.COLOR_BUFFER_BIT);
+	}
+}
+
+Scatterplot.prototype.drawGL = function()
+{
+	var gl = this.gl;
+	if (gl)
+	{
+		// initialize matrices
+		if (!this.projectionMatrix) {
+			this.projectionMatrix = makeOrtho(-SCATTER_PAD_W, this.w-SCATTER_PAD_W, this.h-SCATTER_PAD_H, -SCATTER_PAD_H, -1.0, 1.0);
+			this.mvMatrix = Matrix.I(4);
+
+			// set viewport to match canvas pixel dimensions
+			gl.viewport(0, 0, this.canvasW, this.canvasH);
+			gl.clearColor(0.0, 0.0, 0.0, 0.0);
+			gl.disable(gl.DEPTH_TEST);
+		}
+
+		// compile shader
+		if (!this.shaderProgram) 
+		{
+			var fragmentShader = getShader(gl, "shader-fs");
+			var vertexShader = getShader(gl, "shader-vs");
+			var shaderProgram = gl.createProgram();
+			
+			gl.attachShader(shaderProgram, vertexShader);
+			gl.attachShader(shaderProgram, fragmentShader);
+			gl.linkProgram(shaderProgram);
+
+			// if creating the program failed, alert,
+			if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+				alert("Unable to initialize the shader program: " + gl.getProgramInfoLog(shaderProgram));
+			}
+			else
+			{
+				// get vertex attributes
+				this.vertexPosAttrib = gl.getAttribLocation(shaderProgram, 'aVertexPosition');
+				gl.enableVertexAttribArray(this.vertexPosAttrib);
+
+				this.vertexColorAttrib = gl.getAttribLocation(shaderProgram, 'aVertexColor');
+				gl.enableVertexAttribArray(this.vertexColorAttrib);
+				
+				// set matrix uniforms
+				this.pUniform = gl.getUniformLocation(shaderProgram, 'uPMatrix');
+				this.mvUniform = gl.getUniformLocation(shaderProgram, 'uMVMatrix');
+
+				// store shader program
+				this.shaderProgram = shaderProgram;
+			}
+		}
+		
+
+		// clear
+		gl.clear(gl.COLOR_BUFFER_BIT);
+
+		// use shader
+		gl.useProgram(this.shaderProgram);
+		gl.lineWidth(1.0);
+
+		// update uniforms (projection and modelview matrices)
+		gl.uniformMatrix4fv(this.pUniform, false, new Float32Array(this.projectionMatrix.flatten()));
+		gl.uniformMatrix4fv(this.mvUniform, false, new Float32Array(this.mvMatrix.flatten()));
+
+		// set vertex attributes (position & color)
+		gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
+		gl.vertexAttribPointer(this.vertexPosAttrib, 2, gl.FLOAT, false, 0, 0);
+
+		gl.bindBuffer(gl.ARRAY_BUFFER, this.colorBuffer);		
+		gl.vertexAttribPointer(this.vertexColorAttrib, 4, gl.FLOAT, false, 0, 0);
+
+		// determine range
+		var index1 = this.vertexIndices[this.timeRange[0]];
+		var index2 = this.vertexIndices[this.timeRange[1]];
+		if (!(index1 == -1 && index2 == -1))
+		{
+			index1 = Math.max(0, index1);
+			index2 = Math.max(0, index2);
+			var len = index2-index1+1;
+
+			// draw arrays
+			gl.drawArrays(gl.LINE_STRIP, index1, len);
+		}		
+	}
+}
+
 
 Scatterplot.prototype.update = function()
 {
@@ -433,15 +664,21 @@ Scatterplot.prototype.update = function()
 
 	// update graphics
 	this.updateGraphics();
+
+	// update webgl data and draw
+	this.updateGLData();
+	
+	if (CONNECTED_VISIBILITY) {
+		this.drawGL();
+	}
 }
 
 Scatterplot.prototype.updateGraphics = function()
 {
 	if (this.pointGroup) 
 	{
-		// select scales (global or local)
 		var xScale = this.getXScale();
-		var yScale = this.getYScale(); 
+		var yScale = this.getYScale();
 
 		// create connected scatterplot
 		var pathGenerator = (function() {
@@ -492,8 +729,9 @@ Scatterplot.prototype.enableGlobalScale = function(enabled)
 {
 	if (this.globalScale != enabled) {
 		this.globalScale = enabled;
-		this.updateGraphics();
+		this.update();
 	}
+	console.log("globalScale: " + this.globalScale);
 }
 
 Scatterplot.prototype.setGlobalRange = function(scale1, scale2)
