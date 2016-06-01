@@ -35,6 +35,17 @@ Timeseries.prototype.concat = function(otherSeries, varName)
 			else
 			{
 				this.series.push( v );
+				if (!isNaN(v))
+				{
+					if (!this.extents) {
+						this.extents = [v, v];
+					}
+					else
+					{
+						this.extents[0] = Math.min(this.extents[0], v);
+						this.extents[1] = Math.max(this.extents[1], v);
+					}
+				}
 			}
 		}
 	}

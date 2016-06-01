@@ -41,7 +41,7 @@
 			user-select: none;	
 		}
 
-		svg{
+		svg {
 			
 			-webkit-touch-callout: none;
 			-webkit-user-select: none;
@@ -49,7 +49,6 @@
 			-moz-user-select: none;
 			-ms-user-select: none;
 			user-select: none;
-			
 		}
 
 		select {
@@ -160,7 +159,7 @@
 </head>
 
 <body>
-	<div>
+	<div style="font-family: Helvetica; font-size: 13px">
 		<button onclick="addScatter()">+</button>&nbsp;
 		<button onclick="removeScatter()">&nbsp;-&nbsp;</button>&nbsp;
 		<input id="checkShowPoints" type="checkbox" onclick="scatterVisibility()">Show points &nbsp;
@@ -364,7 +363,7 @@
 		    
 		void main(void) {
 			gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 0.0, 1.0);
-			vColor = vec4(vec3(aVertexColor), 0.7);
+			vColor = vec4(vec3(aVertexColor), 0.65);
 			gl_PointSize = 5.0;
 		}
     </script>

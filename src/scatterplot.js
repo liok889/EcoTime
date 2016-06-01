@@ -22,7 +22,7 @@ var SCATTER_CIRCLE_RADIUS = 2;
 var POINT_VISIBILITY = true;
 var CONNECTED_VISIBILITY = false;
 var ANIMATION_VISIBILITY = false;
-var GLOBAL_SCALE = false;
+var GLOBAL_SCALE = true;
 
 // map for all scatterplots
 var SCATTER_COUNTER = 0;
@@ -35,7 +35,7 @@ var PARTICLE_TRAIL = 40;		// length of trail (for each particle)
 var PARTICLE_MAX_COUNT = 30;	// max number of particles
 var PARTICLE_SPAWN_TIME = 0.02;	// spawn particles every X seconds
 var PARTICLE_SPAWN_COUNT = 10;	// max number of particles to spawn
-var PARTICLE_MAX_OPACITY = 0.3;
+var PARTICLE_MAX_OPACITY = 0.7;
 var PARTICLE_TRAIL_WIDTH = 1;
 
 function Scatterplot(group, width, height, ySeries, xSeries, timeRange, xOffset, yOffset)
@@ -49,16 +49,19 @@ function Scatterplot(group, width, height, ySeries, xSeries, timeRange, xOffset,
 	this.w = width;
 	this.h = height;
 
+	// whether to use global scale by default
+	this.globalScale = GLOBAL_SCALE;
+
 	// offset
 	if (xOffset && yOffset) {
 		this.setContentOffset(xOffset, yOffset);
 	}
 
-	// set time series
-	this.xSeries = xSeries;		// goes to Y axis
-	this.ySeries = ySeries;		// goes to X axis
+	// set time series, avoid updates (3rd true argument)
+	this.setXSeries(xSeries, undefined, true);
+	this.setYSeries(ySeries, undefined, true);
 
-	this.globalScale = GLOBAL_SCALE;
+	// time range
 	this.timeRange = timeRange || [0, ySeries.size()-1];
 
 	// create groups and the various scatterplot elements
@@ -104,6 +107,17 @@ function Scatterplot(group, width, height, ySeries, xSeries, timeRange, xOffset,
 			.style("height", this.h + "px")
 			.style("left", contentOffset[0] + "px")
 			.style("top", contentOffset[1] + "px");
+
+		this.canvas2 = canvasDIV.append("canvas")
+			.attr("class", "scatterCanvas")
+			.attr("id", "canvas" + this.id)
+			.attr("width", canvasW)
+			.attr("height", canvasH)
+			.style("width", this.w + "px")
+			.style("height", this.h + "px")
+			.style("left", contentOffset[0] + "px")
+			.style("top", contentOffset[1] + "px");
+
 
 		// get WebGL context for the canvas
 		this.gl = initWebGL(this.canvas.node());
@@ -248,7 +262,7 @@ Scatterplot.prototype.drawParticles = function()
 
 	// canvas propeties
 	var scale = this.canvasScale;
-	var context = this.canvas.node().getContext("2d");
+	var context = this.canvas2.node().getContext("2d");
 	if (!context) {
 		return;
 	}
@@ -280,7 +294,7 @@ Scatterplot.prototype.drawParticles = function()
 				var alpha = (PARTICLE_TRAIL-j) / PARTICLE_TRAIL;
 				alpha *= PARTICLE_MAX_OPACITY;
 				
-				context.strokeStyle = 'rgba(204, 0, 0, ' + alpha + ')';	;
+				context.strokeStyle = 'rgba(0, 0, 0, ' + alpha + ')';	;
 				context.beginPath();
 				context.moveTo(scale * pp1.x, scale * pp1.y);
 				context.lineTo(scale * pp2.x, scale * pp2.y);
@@ -392,19 +406,49 @@ Scatterplot.prototype.toggleElementVisibility = function()
 	}
 }
 
-Scatterplot.prototype.setXSeries = function(xSeries, varName)
+Scatterplot.prototype.setXSeries = function(xSeries, varName, noUpdate)
 {
 	this.xSeries = xSeries;
-	this.update();
+	
+	// update global scale 1
+	this.globalScale1 = undefined;
+	var extents = xSeries.getExtents();
+	if (extents) {
+		this.globalScale1 = d3.scale.linear()
+			.domain([extents[0], extents[1]])
+			.range([0, this.w-SCATTER_PAD_W*2]);
+	}
+
+	// update
+	if (!noUpdate) {
+		this.update();
+	}
+	
+	// set variable name
 	if (varName) {
 		this.setVarName(varName);
 	}
 }
 
-Scatterplot.prototype.setYSeries = function(ySeries, varName)
+Scatterplot.prototype.setYSeries = function(ySeries, varName, noUpdate)
 {
 	this.ySeries = ySeries;
-	this.update();
+
+	// update global scale 1
+	this.globalScale2 = undefined;
+	var extents = ySeries.getExtents();
+	if (extents) {
+		this.globalScale2 = d3.scale.linear()
+			.domain([extents[0], extents[1]])
+			.range([this.h-SCATTER_PAD_H*2, 0]);
+	}
+
+	// update
+	if (!noUpdate) {
+		this.update();
+	}
+	
+	// set variable name
 	if (varName) {
 		this.setVarName(undefined, varName);
 	}
@@ -428,7 +472,7 @@ Scatterplot.prototype.updateGLData = function()
 		[178,24,43],
 		[178,24,43],
 		[239,138,98],
-		[100, 100, 100],
+		[70, 70, 70],
 		[103,169,207],
 		[33,102,172],
 		[33,102,172]
@@ -722,6 +766,9 @@ Scatterplot.prototype.getXScale = function()
 Scatterplot.prototype.getYScale = function()
 {
 	var yScale = this.globalScale ? this.globalScale2 || this.localScale2 : this.localScale2;
+	if (!this.globalScale && this.rowScale2) {
+		yScale = this.rowScale2;
+	}
 	return yScale;
 }
 
@@ -731,19 +778,19 @@ Scatterplot.prototype.enableGlobalScale = function(enabled)
 		this.globalScale = enabled;
 		this.update();
 	}
-	console.log("globalScale: " + this.globalScale);
 }
 
-Scatterplot.prototype.setGlobalRange = function(scale1, scale2)
+
+Scatterplot.prototype.setYRange = function(scale2)
 {
-	this.globalScale1 = scale1 ? d3.scale.linear().domain(scale1).range([0, this.w-SCATTER_PAD_W*2]) : undefined;
-	this.globalScale2 = scale2 ? d3.scale.linear().domain(scale2).range([this.h-SCATTER_PAD_H*2, 0]) : undefined;
+	this.rowScale2 = scale2 ? d3.scale.linear().domain(scale2).range([this.h-SCATTER_PAD_H*2, 0]) : undefined;
 
 	// update graphics rendering
 	if (this.globalScale) {
 		this.updateGraphics();
 	}
 }
+
 
 // make labels for the X and Y axes
 Scatterplot.prototype.setVarName = function(xName, yName)
@@ -910,7 +957,7 @@ ScatterplotRow.prototype.calcGlobalYScale = function()
 
 	// set it for all scatterplots
 	for (var i=0, N=this.scatterplots.length; i<N; i++) {
-		this.scatterplots[i].setGlobalRange(undefined, globalYRange);
+		this.scatterplots[i].setYRange(globalYRange);
 	}
 
 	// make a y axis
