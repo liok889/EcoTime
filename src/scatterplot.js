@@ -963,7 +963,7 @@ ScatterplotRow.prototype.calcGlobalYScale = function()
 	}
 
 	// make a y axis
-	var yScale = d3.scale.linear().domain(globalYRange).range([SCATTER_H - SCATTER_PAD_H, SCATTER_PAD_H]);
+	var yScale = d3.scale.linear().domain(this.scatterplots[0].getYScale().domain()).range([SCATTER_H - SCATTER_PAD_H, SCATTER_PAD_H]);
 	var yAxis = d3.svg.axis()
 		.scale(yScale)
 		.orient('right')
