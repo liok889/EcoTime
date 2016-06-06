@@ -1,0 +1,14 @@
+
+line.timeline 
+{
+	shape-rendering: crispEdges;
+	stroke: black;
+	fill: none;
+	stroke-width: 1px;
+}
+
+circle.timeline
+{
+	fill: black;
+	stroke: none;
+}
