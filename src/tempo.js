@@ -9,8 +9,12 @@ var TIMELINE_Y = 25;
 var TIMELINE_MAX_W = 600;
 var TIMELINE_END_R = 3;
 var BUTTON_W = 20, BUTTON_H = 20;
-
 var TIMELINE_SLIDER_THICKNESS = 25;
+
+// offset of the column view
+var COLUMN_X = 10;
+var COLUMN_Y = 50;
+var COLUMN_SPACING = 5;
 
 function Tempo(urls)
 {
@@ -35,10 +39,11 @@ function Tempo(urls)
 
 Tempo.prototype.dataReady = function(data)
 {
+	theData = data;
 	this.data = data;
-	this.lenses = [];
-}
+	this.columns = [];
 
+}
 
 Tempo.prototype.init = function()
 {
@@ -80,7 +85,7 @@ Tempo.prototype.init = function()
 		return new Button(tempo.vis,
 			5, TIMELINE_Y-BUTTON_H/2, BUTTON_W, BUTTON_H,
 			"assets/add.png", "assets/add_hover.png", function() {
-				tempo.addView();
+				tempo.addColumn();
 			});
 	})(this);
 
@@ -91,12 +96,16 @@ Tempo.prototype.init = function()
 	this.sliderGroup = this.vis.append("g")
 		.attr("class", "sliderGroup")
 		.attr("transform", "translate(" + TIMELINE_X + "," + (TIMELINE_Y-TIMELINE_SLIDER_THICKNESS/2) + ")");
+
+	// column group
+	this.columnGroup = this.vis.append("g")
+		.attr("class", "columnGroup")
+		.attr("transform", "translate(" + COLUMN_X + "," + COLUMN_Y + ")")
 }
 
-Tempo.prototype.addView = function()
+Tempo.prototype.addColumn = function()
 {
-	console.log("add view!");
-	
+	// add a slider to this column
 	var slider = new RangeSlider(this.sliderGroup, {
 		orientation: "horizontal",
 		range: [0, this.timelineW],
@@ -109,7 +118,14 @@ Tempo.prototype.addView = function()
 		thickness: TIMELINE_SLIDER_THICKNESS
 	});
 
-	// add the data view
+	
+	// figure out the X offset of the row
+	var xOffset = 0;
+	for (var i=0, N=this.columns.length; i<N; i++) {
+		xOffset += this.columns[i].getW() + COLUMN_SPACING;
+	}
+	// add column
+	var column = new TimeColumn()
 
 }
 
