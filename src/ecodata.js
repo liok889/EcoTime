@@ -296,49 +296,58 @@ EcoTimeseries.prototype.generateOneSeries = function(varName)
 	return ts;
 }
 
+EcoTimeseries.prototype.getIntersectionSeries = function(var1, var2)
+{
+	var name = null;
+	if (var1 > var2) {
+		name = var1 + "_*_" + var2;
+	}
+	else {
+		name = var2 + "_*_" + var1;
+	}
+	var ts = this.varCache.get(name);
+	if (!ts) {
+
+		var ts1 = this.generateOneSeries(var1); var series1 = ts1.getSeries();
+		var ts2 = this.generateOneSeries(var2); var series2 = ts2.getSeries();
+
+		var e1 = [Math.MAX_VALUE, -Math.MAX_VALUE];
+		var e1 = [Math.MAX_VALUE, -Math.MAX_VALUE];
+
+		for (var i=0, N=this.timeseries.length; i<N; i++) 
+		{
+			var v1 = series1[i];
+			var v2 = series2[i];
+
+			if (v1 !== null && v1 !== undefined && v2 !== null && v2 !== undefined) 
+			{
+				e1[0] = Math.min(e1[0], v1);
+				e1[1] = Math.max(e1[1], v1);
+				e2[0] = Math.min(e2[0], v2);
+				e2[1] = Math.max(e2[1], v2);
+			}
+		}
+
+		ts1.extents = e1; 
+		ts2.extents = e2;
+		ts1.originalExtents = [e1[0], e1[1]];
+		ts2.originalExtents = [e2[0], e2[1]];
+
+		ts = {}; 
+		ts[var1] = ts1;
+		ts[var2] = ts2;
+
+		this.varCache.set(name, ts);
+	}
+
+	return ts;
+}
+
+
 EcoTimeseries.prototype.getAllSeries = function()
 {
 	return this.timeseries;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 function EcoSpecReading(val) {
 	if (val === "" || isNaN(val) || val == 9999 || val == -9999) {
@@ -349,5 +358,4 @@ function EcoSpecReading(val) {
 		return val;
 	}
 }
-
 

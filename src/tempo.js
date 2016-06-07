@@ -16,6 +16,13 @@ var COLUMN_X = 10;
 var COLUMN_Y = 50;
 var COLUMN_SPACING = 5;
 
+// default column variable
+var DEF_COLUMN_VARIABLE = 'fc';
+
+// list of interesting variables to choose from
+var INTERESTING_VARS = ['PRIsn', 'LE', 'GPP', 'Tair', 'VPD'];
+var ADD_ALL_INTERESTING = true;
+
 function Tempo(urls)
 {
 	this.vis = d3.select("#visSVG");
@@ -32,6 +39,9 @@ function Tempo(urls)
 		})(this, urls);
 	}
 
+	// columns
+	this.columns = [];
+
 	// initialize the basic IU
 	var svgSize = this.getSVGSize();
 	this.init(svgSize.w, svgSize.h);
@@ -41,7 +51,6 @@ Tempo.prototype.dataReady = function(data)
 {
 	theData = data;
 	this.data = data;
-	this.columns = [];
 
 }
 
@@ -122,11 +131,34 @@ Tempo.prototype.addColumn = function()
 	// figure out the X offset of the row
 	var xOffset = 0;
 	for (var i=0, N=this.columns.length; i<N; i++) {
-		xOffset += this.columns[i].getW() + COLUMN_SPACING;
+		xOffset += this.columns[i].column.getW() + COLUMN_SPACING;
 	}
-	// add column
-	var column = new TimeColumn()
 
+	var group = this.columnGroup.append("g")
+		.attr("transform", "translate(" + xOffset + "," + 0 + ")")
+
+	// add column
+	var column = new TimeColumn(group, DEF_COLUMN_VARIABLE);
+	this.columns.push({
+		column: column,
+		slider: slider,
+		group: group
+	});
+
+	// add one variable to the column 
+	if (ADD_ALL_INTERESTING)
+	{
+		var varList = INTERESTING_VARS;
+		for (var i=0; i<varList.length; i++) {
+			column.addView(varList[i]);
+		}
+	}
+	else if (INTERESTING_VARS.length > 0) 
+	{
+		// (choose at random from a list of 'interesting' variables)
+		var r = Math.floor(.5 + Math.random() * (INTERESTING_VARS.length-1));
+		column.addView(INTERESTING_VARS[r]);
+	}
 }
 
 Tempo.prototype.resizeWindow = function()
