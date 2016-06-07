@@ -26,7 +26,7 @@ function RangeSlider(group, orientation, range, position, length, thickness, min
 	(function(slider) 
 	{
 		slider.widget = slider.group.append("rect")
-			
+			.style("shape-rendering", "crispEdges")
 			.attr("x", function() { return slider.orientation == 'horizontal' ? slider.position : 0; })
 			.attr("y", function() { return slider.orientation == 'vertical'   ? slider.position : 0; })
 			.attr("width", function() {  return slider.orientation == 'horizontal' ? slider.length : slider.thickness; })
@@ -35,11 +35,60 @@ function RangeSlider(group, orientation, range, position, length, thickness, min
 			.on("mousemove", function() { 
 				if (!SLIDER_DRAG_EVENT) {
 					d3.select(this).style("stroke",SLIDER_HOVER_COLOR); 
+				
+					var mouse = d3.mouse(this);
+					mouse[0] -= +d3.select(this).attr("x");
+					mouse[1] -= +d3.select(this).attr("y");
+						
+					// choose selector based on slider's orientation
+					var mousePos = slider.orientation == 'horizontal' ? mouse[0] : mouse[1];
+					
+					if (mousePos <= SLIDER_EDGE_SIZE) 
+					{
+						// over the top edge					
+						if (!slider.topEdge)
+						{
+							slider.topEdge = slider.group.append("rect")
+								.style("shape-rendering", "crispEdges")
+								.style("pointer-events", "none")
+								.style("fill", SLIDER_HOVER_COLOR).style("stroke", "none")
+								.attr('x', slider.orientation == 'horizontal' ? slider.position : 0)
+								.attr('y', slider.orientation == 'vertical'   ? slider.position : 0)
+								.attr('width', slider.orientation == 'horizontal' ? SLIDER_EDGE_SIZE : slider.thickness)
+								.attr('height', slider.orientation == 'vertical' ?  SLIDER_EDGE_SIZE : slider.thickness);
+						}
+						slider.removeBottomEdge();
+					}
+					else if (mousePos >= slider.length-SLIDER_EDGE_SIZE)
+					{
+						// over the bottom edge
+						if (!slider.bottomEdge) {
+							slider.bottomEdge = slider.group.append("rect")
+								.style("shape-rendering", "crispEdges")
+								.style("pointer-events", "none")
+								.style("fill", SLIDER_HOVER_COLOR).style("stroke", "none")
+								.attr('x', slider.orientation == 'horizontal' ? slider.position+slider.length-SLIDER_EDGE_SIZE : 0)
+								.attr('y', slider.orientation == 'vertical'   ? slider.position+slider.length-SLIDER_EDGE_SIZE : 0)
+								.attr('width', slider.orientation == 'horizontal' ? SLIDER_EDGE_SIZE : slider.thickness)
+								.attr('height', slider.orientation == 'vertical' ?  SLIDER_EDGE_SIZE : slider.thickness);
+						}
+						slider.removeTopEdge();
+					}
+					else
+					{
+						slider.removeBothEdges();	
+					}
+				}
+				else
+				{
+			
 				}
 			})
-			.on("mouseout", function() { 
+			.on("mouseout", function() 
+			{ 
 				if (!SLIDER_DRAG_EVENT) {
 					d3.select(this).style("stroke", "none"); 
+					slider.removeBothEdges();
 				}
 			})
 			.on("mousedown", function() 
@@ -159,6 +208,17 @@ function RangeSlider(group, orientation, range, position, length, thickness, min
 								.attr(slider.orientation == 'horizontal' ? 'x' : 'y', position)
 								.attr(slider.orientation == 'horizontal' ? 'width' : 'height', length);
 							
+							if (slider.dragControl == 3 && slider.bottomEdge) {
+								slider.bottomEdge
+									.attr('x', slider.orientation == 'horizontal' ? slider.position+slider.length-SLIDER_EDGE_SIZE : 0)
+									.attr('y', slider.orientation == 'vertical'   ? slider.position+slider.length-SLIDER_EDGE_SIZE : 0)
+							}
+ 							else if (slider.dragControl == 2 && slider.topEdge) {
+ 								slider.topEdge
+									.attr('x', slider.orientation == 'horizontal' ? slider.position : 0)
+									.attr('y', slider.orientation == 'vertical'   ? slider.position : 0)
+ 							}
+
 							if (slider.callback) {
 								slider.callback(slider.getNormalizedRange());
 							}
@@ -170,10 +230,31 @@ function RangeSlider(group, orientation, range, position, length, thickness, min
 						slider.widget.style("stroke", "none").style("stroke-width", "");
 						slider.dragControl = undefined;
 						d3.select(document).on("mouseup.sliderDragEvent", null).on("mousemove.sliderDragEvent", null);
+						slider.removeBothEdges();
 					});
 			});
 	})(this);
 
+}
+
+RangeSlider.prototype.removeTopEdge = function() 
+{
+	if (this.topEdge) {
+		this.topEdge.remove();
+		this.topEdge = undefined;
+	}
+}
+RangeSlider.prototype.removeBottomEdge = function() 
+{
+	if (this.bottomEdge) {
+		this.bottomEdge.remove();
+		this.bottomEdge = undefined;
+	}
+}
+RangeSlider.prototype.removeBothEdges = function()
+{
+	this.removeTopEdge();
+	this.removeBottomEdge();
 }
 
 RangeSlider.prototype.setFixedPosition = function(fixed)
