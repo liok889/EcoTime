@@ -3,9 +3,9 @@
  * ---------------------------------------
  */
 
-var SLIDER_MIN_LENGTH = 20;
-var SLIDER_LENGTH = 40;
-var SLIDER_THICKNESS = 10;
+var DEFAULT_SLIDER_MIN_LENGTH = 20;
+var DEFAULT_SLIDER_LENGTH = 40;
+var DEFAULT_SLIDER_THICKNESS = 10;
 var SLIDER_EDGE_SIZE = 5;
 
 var SLIDER_DRAG_EVENT = false;
@@ -15,26 +15,46 @@ var SLIDER_DRAG_COLOR = "red";
 function RangeSlider(group, orientation, range, position, length, thickness, minLength)
 {
 	this.group = group.append("g");
-	this.orientation = orientation;
+	if ((typeof orientation === "object") && orientation !== null) 
+	{
+		var options = orientation;
 
-	this.range = range;
-	this.position = position;
-	this.length = length;
-	this.thickness = thickness || SLIDER_THICKNESS;
-	this.minLength = minLength || SLIDER_MIN_LENGTH;
+		this.orientation = options.orientation;
+		this.range = options.range;
+		this.position = options.position || 0;
+		this.length = options.length || DEFAULT_SLIDER_LENGTH;
+		this.thickness = options.thickness || DEFAULT_SLIDER_THICKNESS;
+		this.minLength = options.minLength || DEFAULT_SLIDER_MIN_LENGTH;
+		
+		this.hoverColor = options.hoverColor || SLIDER_HOVER_COLOR;
+		this.dragColor = options.dragColor || SLIDER_DRAG_COLOR;
+		this.fillColor = options.fillColor;
+		this.rx = options.rx;
+		this.ry = options.ry;
+	}
+	else
+	{
+		this.orientation = orientation;
+		this.range = range;
+		this.position = position || 0;
+		this.length = length || DEFAULT_SLIDER_LENGTH;
+		this.thickness = thickness || DEFAULT_SLIDER_THICKNESS;
+		this.minLength = minLength || DEFAULT_SLIDER_MIN_LENGTH;
+	}
 
 	(function(slider) 
 	{
 		slider.widget = slider.group.append("rect")
-			.style("shape-rendering", "crispEdges")
 			.attr("x", function() { return slider.orientation == 'horizontal' ? slider.position : 0; })
 			.attr("y", function() { return slider.orientation == 'vertical'   ? slider.position : 0; })
 			.attr("width", function() {  return slider.orientation == 'horizontal' ? slider.length : slider.thickness; })
 			.attr("height", function() { return slider.orientation == 'vertical'   ? slider.length : slider.thickness; })
 			.attr("class", "rangeSlider")
+			.attr("rx", slider.rx).attr("ry", slider.ry)
+			.style("fill", this.fillColor || "")
 			.on("mousemove", function() { 
 				if (!SLIDER_DRAG_EVENT) {
-					d3.select(this).style("stroke",SLIDER_HOVER_COLOR); 
+					d3.select(this).style("stroke", slider.hoverColor || SLIDER_HOVER_COLOR); 
 				
 					var mouse = d3.mouse(this);
 					mouse[0] -= +d3.select(this).attr("x");
@@ -49,9 +69,9 @@ function RangeSlider(group, orientation, range, position, length, thickness, min
 						if (!slider.topEdge)
 						{
 							slider.topEdge = slider.group.append("rect")
-								.style("shape-rendering", "crispEdges")
 								.style("pointer-events", "none")
-								.style("fill", SLIDER_HOVER_COLOR).style("stroke", "none")
+								.style("fill", slider.hoverColor || SLIDER_HOVER_COLOR).style("stroke", "none")
+								.attr("rx", slider.rx).attr("ry", slider.ry)
 								.attr('x', slider.orientation == 'horizontal' ? slider.position : 0)
 								.attr('y', slider.orientation == 'vertical'   ? slider.position : 0)
 								.attr('width', slider.orientation == 'horizontal' ? SLIDER_EDGE_SIZE : slider.thickness)
@@ -64,9 +84,9 @@ function RangeSlider(group, orientation, range, position, length, thickness, min
 						// over the bottom edge
 						if (!slider.bottomEdge) {
 							slider.bottomEdge = slider.group.append("rect")
-								.style("shape-rendering", "crispEdges")
 								.style("pointer-events", "none")
-								.style("fill", SLIDER_HOVER_COLOR).style("stroke", "none")
+								.style("fill", slider.hoverColor || SLIDER_HOVER_COLOR).style("stroke", "none")
+								.attr("rx", slider.rx).attr("ry", slider.ry)
 								.attr('x', slider.orientation == 'horizontal' ? slider.position+slider.length-SLIDER_EDGE_SIZE : 0)
 								.attr('y', slider.orientation == 'vertical'   ? slider.position+slider.length-SLIDER_EDGE_SIZE : 0)
 								.attr('width', slider.orientation == 'horizontal' ? SLIDER_EDGE_SIZE : slider.thickness)
@@ -94,7 +114,7 @@ function RangeSlider(group, orientation, range, position, length, thickness, min
 			.on("mousedown", function() 
 			{
 				SLIDER_DRAG_EVENT = true;
-				slider.widget.style("stroke", SLIDER_DRAG_COLOR);
+				slider.widget.style("stroke", slider.dragColor || SLIDER_DRAG_COLOR);
 				var mouse = d3.mouse(this);
 				mouse[0] -= +d3.select(this).attr("x");
 				mouse[1] -= +d3.select(this).attr("y");
@@ -108,11 +128,17 @@ function RangeSlider(group, orientation, range, position, length, thickness, min
 				if (mousePos <= SLIDER_EDGE_SIZE) {
 					// dragging top edge					
 					slider.dragControl = 2;
+					if (slider.topEdge) {
+						slider.topEdge.style("fill", slider.dragColor || SLIDER_DRAG_COLOR);
+					}
 				}
 				else if (mousePos >= slider.length-SLIDER_EDGE_SIZE)
 				{
 					// dragging bottom edge
 					slider.dragControl = 3;
+					if (slider.bottomEdge) {
+						slider.bottomEdge.style("fill", slider.dragColor || SLIDER_DRAG_COLOR);
+					}
 				}
 				else
 				{

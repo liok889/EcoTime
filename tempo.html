@@ -12,10 +12,12 @@
 	<!-- code delivery network -->
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.6/d3.min.js" charset="utf-8"></script>
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/queue-async/1.0.7/queue.min.js"></script>
+	<!--
 	<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.2.4/jquery.min.js"></script>
+	-->
 
 	<!-- local libraries -->
-	<script src='lib/papaparse.js' type='text/javascript'></script>
+	<script src='lib/papaparse.min.js' type='text/javascript'></script>
 	<script src='lib/sylvester.js' type='text/javascript'></script>
 	<script src='lib/glUtils.js' type='text/javascript'></script>
 
@@ -25,8 +27,7 @@
 	<!-- sources -->
 	<script src="src/ecodata.js" type="text/javascript"></script>
 	<script src="src/timeseries.js" type="text/javascript"></script>
-	<script src="src/scatterplot.js" type="text/javascript"></script>
-	<script src="src/timeplot.js" type="text/javascript"></script>
+	<script src="src/slider.js" type="text/javascript"></script>
 	<script src="src/tempo.js" type="text/javascript"></script>
 	<script src="src/ui_utils.js" type="text/javascript"></script>
 
@@ -53,6 +54,11 @@
 			background-color: #4e4e4e;
 		}
 
+		div.visSpace {
+			height: 800px;
+			margin: 10px 10px;
+		}
+
 		#visSVG {
 			border: 1px dashed #cccccc;
 		}
@@ -70,15 +76,25 @@
 			top: 0px; left: 0px;
 			z-index: 200;
 			pointer-events: none;
-			border: 1px solid red;
 		}
+
+		.rangeSlider {
+			stroke: none;
+			/*fill: rgba(153, 204, 255, 0.85);*/
+			fill: rgba(179, 217, 255, 0.85);
+
+		}
+
 	</style>
 </head>
 <body>
+	<!-- app title -->
 	<div class="appTitle" width="100%">
 		<b>Tempo</b> - Visualization of (many) time series
 	</div>
-	<div width="100%" style="height: 800px; margin: 15px 15px">
+
+	<!-- visualization space -->
+	<div class="visSpace" width="100%">
 		<svg id="visSVG" width="100%" height="100%" style="border: 1px dashed #cccccc"></svg>
 		<canvas id="visCanvas"></canvas>
 		<svg id="interactSVG" width="0" height="0"></svg>
@@ -117,13 +133,26 @@
 			}
 		}
 		window.onresize = resizeWindow;
+		
+		// fire up things
+		function fireup() {
+			resizeWindow();
+
+			// initialize the vis
+			tempo = new Tempo();
+		}
+
+		fireup();
+		
+		/*
+		// jQuery initialization
 		$(document).ready(function() 
 		{
-			resizeWindow();
-		
-			// initialize the visualization
-			tempo = new Tempo();
+			fireup();
 		});
+		*/
+
+
 	</script>
 </body>
 </html>

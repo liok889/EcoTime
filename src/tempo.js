@@ -5,10 +5,12 @@
  */
 
 var TIMELINE_X = 35;
-var TIMELINE_Y = 15;
+var TIMELINE_Y = 25;
 var TIMELINE_MAX_W = 600;
 var TIMELINE_END_R = 3;
 var BUTTON_W = 20, BUTTON_H = 20;
+
+var TIMELINE_SLIDER_THICKNESS = 25;
 
 function Tempo(urls)
 {
@@ -38,7 +40,6 @@ Tempo.prototype.dataReady = function(data)
 }
 
 
-
 Tempo.prototype.init = function()
 {
 	// make groups and basic UI elements for the Tempo interface
@@ -63,12 +64,12 @@ Tempo.prototype.init = function()
 	var c1 = group.append("circle")
 		.attr("r", TIMELINE_END_R + "px")
 		.attr("class", "timeline")
-		.attr("cx", 0).attr("cy", 0);
+		.attr("cx", -TIMELINE_END_R).attr("cy", 0);
 	
 	var c2 = group.append("circle")
 		.attr("r", TIMELINE_END_R + "px")
 		.attr("class", "timeline")
-		.attr("cx", timelineW).attr("cy", 0);
+		.attr("cx", timelineW+TIMELINE_END_R).attr("cy", 0);
 
 	this.timeline = timeline;
 	this.timelineCircles = [c1, c2];
@@ -82,11 +83,34 @@ Tempo.prototype.init = function()
 				tempo.addView();
 			});
 	})(this);
+
+	// store timeline width
+	this.timelineW = timelineW;
+
+	// slider group
+	this.sliderGroup = this.vis.append("g")
+		.attr("class", "sliderGroup")
+		.attr("transform", "translate(" + TIMELINE_X + "," + (TIMELINE_Y-TIMELINE_SLIDER_THICKNESS/2) + ")");
 }
 
 Tempo.prototype.addView = function()
 {
 	console.log("add view!");
+	
+	var slider = new RangeSlider(this.sliderGroup, {
+		orientation: "horizontal",
+		range: [0, this.timelineW],
+		position: 0,
+		length: 30,
+		minLength: 15,
+		rx: 3, ry: 3,
+		hoverColor: '#777777',
+		dragColor: '#ff5050',
+		thickness: TIMELINE_SLIDER_THICKNESS
+	});
+
+	// add the data view
+
 }
 
 Tempo.prototype.resizeWindow = function()
@@ -95,10 +119,10 @@ Tempo.prototype.resizeWindow = function()
 	var w = svgSize.w;
 	var h = svgSize.h;
 
-	var timelineW = Math.min(TIMELINE_MAX_W, w - 2*TIMELINE_X);
+	this.timelineW = Math.min(TIMELINE_MAX_W, w - 2*TIMELINE_X);
 
-	this.timeline.attr("x2", timelineW);
-	this.timelineCircles[1].attr("cx", timelineW);
+	this.timeline.attr("x2", this.timelineW);
+	this.timelineCircles[1].attr("cx", this.timelineW+TIMELINE_END_R);
 }
 
 Tempo.prototype.getSVGSize = function()
