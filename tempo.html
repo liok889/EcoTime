@@ -6,11 +6,10 @@
 	<!-- css -->
 	<link href='css/tempo.css' rel='stylesheet' type='text/css'>
 
-	<!-- fonts -->
 	<link href='https://fonts.googleapis.com/css?family=Lato:400,300,700' rel='stylesheet' type='text/css'>
+	<link href='https://fonts.googleapis.com/css?family=Anonymous+Pro:400,700' rel='stylesheet' type='text/css'>
 
-	<!-- code delivery network -->
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.6/d3.min.js" charset="utf-8"></script>
+	<script src="lib/d3.min.js" charset="utf-8"></script>
 	<!--
 	<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.2.4/jquery.min.js"></script>
 	-->
@@ -35,7 +34,7 @@
 
 	<style>
 		body {
-			font-family: 'Lato', sans-serif;
+			font-family: 'Lato', 'Helvetica', sans-serif;
 			font-weight: 300;
 			font-size: 12px;
 			margin: 0px 0px;
@@ -45,7 +44,7 @@
 			-moz-user-select: none;
 			-ms-user-select: none;
 			user-select: none;
-			pointer: default;
+			cursor: default;
 		}
 
 		div.appTitle {
@@ -102,14 +101,46 @@
 		<svg id="interactSVG" width="0" height="0"></svg>
 	</div>
 
+	<script id="shader-vs" type="x-shader/x-vertex">
+		attribute vec2 aVertexPosition;
+		attribute vec4 aVertexColor;   
+
+		uniform mat4 uMVMatrix;
+		uniform mat4 uPMatrix;
+
+		uniform vec2 rangeMin;
+		uniform vec2 rangeLen;
+		uniform vec2 domainMin;
+		uniform vec2 domainLen;
+
+		// color
+		varying lowp vec4 vColor;
+				    
+		void main(void) {
+
+			vec2 p = ((aVertexPosition - rangeMin) / rangeLen) * domainMin + domainLen;
+			gl_Position = uPMatrix * uMVMatrix * vec4(p, 0.0, 1.0);
+			vColor = vec4(vec3(aVertexColor), aVertexColor.a * 0.65);
+			gl_PointSize = 5.0;
+		}
+	</script>
+	<script id="shader-fs" type="x-shader/x-fragment">
+		varying lowp vec4 vColor;
+		void main(void) {
+			gl_FragColor = vColor;
+		}
+	</script>
+
+
 	<script type="text/javascript">
 		var tempo = null;
-		var theData = null;		// global object containing EcoTimeseries
 		var TIMESERIES_DATA = [
 			'data/indices_mid-day_avg_prep_02-21-2016g_flagExcluded.csv',
 			'data/EcoSpec_Summer_2015_GPP_Reco_data_new_DOY-shifted.csv',
 			'data/Decagon_NDVI_&_PRI_02-27-2017_30min.csv'
 		];
+		var theData = new EcoTimeseries(TIMESERIES_DATA, dataReady);
+		var gl = null;
 
 		function resizeWindow()
 		{
@@ -138,14 +169,15 @@
 		window.onresize = resizeWindow;
 		
 		// fire up things
-		function fireup() {
+		function dataReady() {
 			resizeWindow();
 
 			// initialize the vis
 			tempo = new Tempo();
+		
+			// get gl context
+			gl = d3.select("#visCanvas").node().getContext("webgl");
 		}
-
-		fireup();
 		
 		/*
 		// jQuery initialization

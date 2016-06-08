@@ -23,21 +23,11 @@ var DEF_COLUMN_VARIABLE = 'fc';
 var INTERESTING_VARS = ['PRIsn', 'LE', 'GPP', 'Tair', 'VPD'];
 var ADD_ALL_INTERESTING = true;
 
-function Tempo(urls)
+function Tempo()
 {
 	this.vis = d3.select("#visSVG");
 	this.canvas = d3.select("#visCanvas");
 	this.interact = d3.select("#interactSVG");
-
-	if (urls)
-	{
-		(function(tempo, urls) 
-		{
-			new EcoTimeseries(urls, function(data) {
-				tempo.dataReady(data);
-			});
-		})(this, urls);
-	}
 
 	// columns
 	this.columns = [];
@@ -45,13 +35,6 @@ function Tempo(urls)
 	// initialize the basic IU
 	var svgSize = this.getSVGSize();
 	this.init(svgSize.w, svgSize.h);
-}
-
-Tempo.prototype.dataReady = function(data)
-{
-	theData = data;
-	this.data = data;
-
 }
 
 Tempo.prototype.init = function()
@@ -150,6 +133,7 @@ Tempo.prototype.addColumn = function()
 	{
 		var varList = INTERESTING_VARS;
 		for (var i=0; i<varList.length; i++) {
+			console.log("adding: " + varList[i]);
 			column.addView(varList[i]);
 		}
 	}
@@ -183,4 +167,164 @@ Tempo.prototype.getSVGSize = function()
 		w: w, h: h 
 	};
 }
+
+Tempo.prototype.renderGL = function(gl)
+{
+	// initialize the shader
+	// =====================
+	var canvasSize = this.getSVGSize();
+
+	// initialize projection and modelview matrix
+	var projectionMatrix = makeOrtho(0, canvasSize.w, canvasSize.h, 0. -1.0, 1.0);
+	var mvMatrix = Matrix.I(4);
+
+	// compile shader
+	if (!this.shaderProgram) 
+	{
+		var fragmentShader = getShader(gl, "shader-fs");
+		var vertexShader = getShader(gl, "shader-vs");
+		var shaderProgram = gl.createProgram();
+			
+		gl.attachShader(shaderProgram, vertexShader);
+		gl.attachShader(shaderProgram, fragmentShader);
+		gl.linkProgram(shaderProgram);
+
+		// if creating the program failed, alert,
+		if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+			alert("Unable to initialize the shader program: " + gl.getProgramInfoLog(shaderProgram));
+		}
+		else
+		{
+			// get vertex attributes
+			this.vertexPosAttrib = gl.getAttribLocation(shaderProgram, 'aVertexPosition');
+			gl.enableVertexAttribArray(this.vertexPosAttrib);
+
+			this.vertexColorAttrib = gl.getAttribLocation(shaderProgram, 'aVertexColor');
+			gl.enableVertexAttribArray(this.vertexColorAttrib);
+				
+			// matrix uniforms
+			this.pUniform = gl.getUniformLocation(shaderProgram, 'uPMatrix');
+			this.mvUniform = gl.getUniformLocation(shaderProgram, 'uMVMatrix');
+
+			// range / domain variables
+			this.rangeMin = gl.getUniformLocation(shaderProgram, "rangeMin");
+			this.rangeLen = gl.getUniformLocation(shaderProgram, "rangeLen");
+			this.domainMin = gl.getUniformLocation(shaderProgram, "domainMin");
+			this.domainLen = gl.getUniformLocation(shaderProgram, "domainLen");
+
+			// store shader program
+			this.shaderProgram = shaderProgram;
+		}
+	}
+
+	// clear
+	gl.clear(gl.COLOR_BUFFER_BIT);
+
+	// use the shader
+	gl.useProgram(this.shaderProgram);
+	gl.lineWidth(1.0);
+
+	// update uniforms (projection and modelview matrices)
+	gl.uniformMatrix4fv(this.pUniform, false, new Float32Array(projectionMatrix.flatten()));
+	gl.uniformMatrix4fv(this.mvUniform, false, new Float32Array(mvMatrix.flatten()));
+
+	// loop through all columns and render them
+	// =========================================
+	var columns = this.columns;
+	var screenOffset= [COLUMN_X, COLUMN_Y];
+
+	for (var i=0, N=columns.length; i<N; i++)
+	{
+		// column and slider
+		var column = columns[i].column;
+		var slider = columns[i].slider;
+
+		// get the time range for the slider
+		var timeRange = timeRangeFromNormalized(slider.getNormalizedRange());
+		console.log('timeRange: ' + timeRange);
+
+		// screen offset
+		var rangeMin = [
+			screenOffset[0] + SCATTER_PAD, 
+			screenOffset[1] + SCATTER_PAD
+		];
+
+		var rangeLen = [column.getW() - SCATTER_PAD*2, 0];
+
+		// get the views of this column
+		var views = column.getViews();
+		for (var j=0; j < views.length; j++)
+		{
+			var view = views[j];
+			rangeLen[1] = view.getH() - SCATTER_PAD*2
+
+			var xDomain = view.getXDomain();
+			var yDomain = view.getYDomain();
+
+			var domainMin = [xDomain[0], yDomain[0]];
+			var domainLen = [xDomain[1]-xDomain[0], yDomain[1]-yDomain[0]];
+
+			// update the uniform
+			gl.uniform2fv(this.rangeMin, new Float32Array(rangeMin));
+			gl.uniform2fv(this.rangeLen, new Float32Array(rangeLen));
+			gl.uniform2fv(this.domainMin, new Float32Array(domainMin));
+			gl.uniform2fv(this.domainLen, new Float32Array(domainLen));
+			
+			// render
+			var glData = getGLData(gl, view.getXVar(), view.getYVar());
+
+			// determine draw range
+			var i0 = Math.max(0, glData.indicies[ timeRange[0] ]);
+			var i1 = Math.max(0, glData.indicies[ timeRange[1] ]);
+			var drawLen = i1-i0+1;
+			if (drawLen > 0) 
+			{
+				gl.bindBuffer(gl.ARRAY_BUFFER, glData.vertexBuffer);
+				gl.vertexAttribPointer(this.vertexPosAttrib, 2, gl.FLOAT, false, 0, 0);
+
+				gl.bindBuffer(gl.ARRAY_BUFFER, glData.colorBuffer);		
+				gl.vertexAttribPointer(this.vertexColorAttrib, 4, gl.FLOAT, false, 0, 0);
+				gl.drawArrays(gl.LINE_STRIP, i0, drawLen);
+			}
+
+			// offset screen Y to the next scatter plot
+			screenOffset[1] += rangeLen[1] + SCATTER_PAD + SCATTER_SPACING;
+		}
+
+		// run the offset
+		screenOffset[0] += COLUMN_SPACING + column.getW();
+	}
+}
+
+function timeRangeFromNormalized(nRange)
+{
+	var N = theData.getTimeLength();		
+	return [ Math.floor(nRange[0] * (N-1)+0.5), Math.min(N-1,Math.floor(nRange[1] * (N-1)+0.5)) ];
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

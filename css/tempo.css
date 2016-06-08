@@ -12,3 +12,16 @@ circle.timeline
 	fill: black;
 	stroke: none;
 }
+
+rect.scatterBorderRect {
+	stroke: #cccccc;
+	stroke-width: 1px;
+	fill: none;
+}
+
+.variableName 
+{
+	font-family: 'Anonymous Pro', sans-serif;
+	fill: red;
+	cursor: pointer;
+}
