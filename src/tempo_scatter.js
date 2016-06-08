@@ -5,8 +5,8 @@
  */
 
 // default dimensions of the scatterplot view
-var DEF_SCATTER_W = 150;
-var DEF_SCATTER_H = 150;
+var DEF_SCATTER_W = 120;
+var DEF_SCATTER_H = 120;
 
 // padding inside the scatterplot view
 var SCATTER_PAD = 7;

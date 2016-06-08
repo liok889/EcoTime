@@ -195,11 +195,19 @@ Tempo.prototype.addColumn = function()
 	column.setScreenOffset([COLUMN_X + xOffset, COLUMN_Y]);
 
 	// add ribon
-	var ribbon = this.ribbonGroup.append("path")
-		.style("fill", sliderColor)
-		.style("stroke", sliderColor)
-		.style("stroke-width", "1px")
-		.style("fill-opacity", SLIDER_OPACITY || "");
+	var ribbon = (function(ribbonGroup, slider) 
+	{
+		return ribbonGroup.append("path")
+			.style("fill", sliderColor)
+			.style("stroke", sliderColor)
+			.style("stroke-width", "1px")
+			.style("fill-opacity", SLIDER_OPACITY || "")
+			.on("mouseover", function() {
+				if (!SLIDER_DRAG_EVENT) {
+					slider.putOnTop();
+				}
+			});
+	})(this.ribbonGroup, slider);
 
 	// add a ribon to the column
 	connectSliderToColumn(ribbon, slider, column);
@@ -221,6 +229,10 @@ Tempo.prototype.addColumn = function()
 			
 			// update the ribbon
 			connectSliderToColumn(ribbon, slider, column);
+		});
+
+		slider.setOnTopCallback(function() {
+			putNodeOnTop(ribbon.node());
 		});
 	})(this, slider, column, ribbon);
 
@@ -330,7 +342,7 @@ Tempo.prototype.renderGL = function()
 
 	// use the shader
 	gl.useProgram(this.shaderProgram);
-	gl.lineWidth(1.0);
+	gl.lineWidth(2.0);
 
 	// update uniforms (projection and modelview matrices)
 	gl.uniformMatrix4fv(this.pUniform, false, new Float32Array(projectionMatrix.flatten()));

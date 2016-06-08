@@ -54,6 +54,11 @@ function RangeSlider(group, orientation, range, position, length, thickness, min
 			.attr("rx", slider.rx).attr("ry", slider.ry)
 			.style("fill-opacity", slider.fillOpacity || "")
 			.style("fill", slider.fillColor || "")
+			.on("mouseover", function() {
+				if (!SLIDER_DRAG_EVENT) {
+					slider.putOnTop();
+				}
+			})
 			.on("mousemove", function() { 
 				if (!SLIDER_DRAG_EVENT) {
 					d3.select(this).style("stroke", slider.hoverColor || SLIDER_HOVER_COLOR); 
@@ -115,9 +120,6 @@ function RangeSlider(group, orientation, range, position, length, thickness, min
 			})
 			.on("mousedown", function() 
 			{
-				// put slider on top (of other sliders)
-				putNodeOnTop(slider.group.node());
-
 				SLIDER_DRAG_EVENT = true;
 				slider.widget.style("stroke", slider.dragColor || SLIDER_DRAG_COLOR);
 				var mouse = d3.mouse(this);
@@ -268,6 +270,14 @@ function RangeSlider(group, orientation, range, position, length, thickness, min
 
 }
 
+RangeSlider.prototype.putOnTop = function()
+{
+	putNodeOnTop(this.group.node());
+	if (this.onTopCallback) {
+		this.onTopCallback();
+	}
+}
+
 RangeSlider.prototype.getScreenOffset = function()
 {
 	return [this.screenOffset[0], this.screenOffset[1]];
@@ -321,4 +331,7 @@ RangeSlider.prototype.getNormalizedRange = function()
 
 RangeSlider.prototype.setCallback = function(callback) {
 	this.callback = callback
+}
+RangeSlider.prototype.setOnTopCallback = function(callback) {
+	this.onTopCallback = callback
 }
