@@ -20,6 +20,15 @@ TimeColumn.prototype.getW = function()
 	return this.w;
 }
 
+TimeColumn.prototype.getScreenOffset = function()
+{
+	return [this.screenOffset[0], this.screenOffset[1]];
+}
+TimeColumn.prototype.setScreenOffset = function(offset)
+{
+	this.screenOffset = offset;
+}
+
 TimeColumn.prototype.addView = function(varName)
 {
 	// calculate y Offset

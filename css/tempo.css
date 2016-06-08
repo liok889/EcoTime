@@ -14,9 +14,10 @@ circle.timeline
 }
 
 rect.scatterBorderRect {
-	stroke: #cccccc;
-	stroke-width: 1px;
-	fill: none;
+	stroke: #dddddd;
+	stroke-width: 0.5px;
+	fill: white;
+	fill-opacity: 0.0;
 }
 
 .variableName 

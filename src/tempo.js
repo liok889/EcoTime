@@ -13,16 +13,18 @@ var TIMELINE_SLIDER_THICKNESS = 25;
 
 // offset of the column view
 var COLUMN_X = 10;
-var COLUMN_Y = 50;
-var COLUMN_SPACING = 5;
+var COLUMN_Y = 100;
+var COLUMN_SPACING = 0;
 
 // default column variable
 var DEF_COLUMN_VARIABLE = 'fc';
+var DEF_SLIDER_LENGTH = 40;
+var DEF_SLIDER_MIN_LENGTH = 15;
 
 // list of interesting variables to choose from
 var INTERESTING_VARS = ['PRIsn', 'LE', 'Tair', 'VPD'];
 var ADD_ALL_INTERESTING = true;
-
+var SLIDER_OPACITY = 0.8;
 function Tempo()
 {
 	this.vis = d3.select("#visSVG");
@@ -44,6 +46,10 @@ Tempo.prototype.init = function()
 	var w = svgSize.w;
 	var h = svgSize.h;
 
+	// ribbon group: connect the slider to their TimeColumn
+	this.ribbonGroup = this.vis.append("g")
+		.attr("class", "ribbonGroup");
+
 	// make the timeline
 	group = this.vis.append("g")
 		.attr("class", "timelineGroup")
@@ -54,6 +60,7 @@ Tempo.prototype.init = function()
 
 	var timeline = group.append("line")
 		.attr("class", "timeline")
+		.style("stroke", "#444444")
 		.attr("x1", 0).attr("y1", 0)
 		.attr("x2", timelineW).attr("y1", 0);
 
@@ -95,27 +102,84 @@ Tempo.prototype.init = function()
 		.attr("transform", "translate(" + COLUMN_X + "," + COLUMN_Y + ")")
 }
 
+var SLIDER_COLORS = [
+	'#fbb4ae',
+	'#b3cde3',
+	'#ccebc5',
+	'#decbe4',
+	'#fed9a6',
+	'#ffffcc'
+].reverse();
+var SLIDER_DEFAULT_COLOR = "#cccccc";
+
+
+
+function connectSliderToColumn(ribbon, slider, column)
+{
+	function generateRibbonPath(p1, p2, thickness)
+	{
+		if (!thickness) {
+			thickness = 15;
+		}
+		var s = -30;
+		var b = thickness / 2;
+
+		var d = "M" + (p1[0]-b) + " " + p1[1] + " ";
+
+		d += "C " + (p1[0]-b) + " " + (p1[1]-s) + ", " + (p2[0]-b) + ' ' + (p2[1]+s) + ', ' + (p2[0]-b) + ' ' + p2[1] + ' ';
+		d += "H " + (p2[0]+b) + " ";
+		d += "C " + (p2[0]+b) + " " + (p2[1]+s) + ", " + (p1[0]+b) + ' ' + (p1[1]-s) + ', ' + (p1[0]+b) + ' ' + p1[1] + ' Z';
+		return d;	 
+	}
+
+	var p1 = [
+		TIMELINE_X + slider.getPosition() + slider.getLength()/2,
+		TIMELINE_Y + TIMELINE_SLIDER_THICKNESS/2+1
+	];
+	var p2 = column.getScreenOffset();
+	p2[0] += column.getW()/2;
+	ribbon.attr("d", generateRibbonPath(p1, p2));
+}
+
 Tempo.prototype.addColumn = function()
 {
+	var sliderColor = SLIDER_DEFAULT_COLOR;
+	if (SLIDER_COLORS.length > 0) {
+		sliderColor = SLIDER_COLORS.pop();
+	}
+
+	// find a new position for the slider
+	var lastSlider = 0;
+	for (var i=0; i < this.columns.length; i++) 
+	{
+		var slider = this.columns[i].slider;
+		lastSlider = Math.max(lastSlider, slider.getPosition() + slider.getLength()); 
+	}
+
+	// figure out the position of the slider
+	var availableSpace = this.timelineW - lastSlider;
+	var sliderLen = Math.min(availableSpace, DEF_SLIDER_LENGTH);
+	var sliderPos = lastSlider;
+	if (sliderLen < DEF_SLIDER_MIN_LENGTH) {
+		// pick up random position
+		sliderPosition = Math.floor(Math.random() * (this.timelineW-DEF_SLIDER_LENGTH-10));
+		sliderLen = DEF_SLIDER_LENGTH;
+	}
+
 	// add a slider to this column
 	var slider = new RangeSlider(this.sliderGroup, {
 		orientation: "horizontal",
 		range: [0, this.timelineW],
-		position: 0,
-		length: 30,
-		minLength: 15,
+		position: sliderPos,
+		length: sliderLen,
+		minLength: DEF_SLIDER_MIN_LENGTH,
 		rx: 3, ry: 3,
+		fillOpacity: SLIDER_OPACITY,
+		fillColor: sliderColor,
 		hoverColor: '#777777',
 		dragColor: '#ff5050',
 		thickness: TIMELINE_SLIDER_THICKNESS
 	});
-
-		
-	(function(tempo, slider) {
-		slider.setCallback(function() {
-			tempo.renderGL(gl);
-		});
-	})(this, slider);
 
 	// figure out the X offset of the row
 	var xOffset = 0;
@@ -128,11 +192,38 @@ Tempo.prototype.addColumn = function()
 
 	// add column
 	var column = new TimeColumn(group, DEF_COLUMN_VARIABLE);
-	this.columns.push({
+	column.setScreenOffset([COLUMN_X + xOffset, COLUMN_Y]);
+
+	// add ribon
+	var ribbon = this.ribbonGroup.append("path")
+		.style("fill", sliderColor)
+		.style("stroke", sliderColor)
+		.style("stroke-width", "1px")
+		.style("fill-opacity", SLIDER_OPACITY || "");
+
+	// add a ribon to the column
+	connectSliderToColumn(ribbon, slider, column);
+
+	this.columns.push(
+	{
 		column: column,
 		slider: slider,
-		group: group
+		ribbon: ribbon,
 	});
+
+	// slider to callback
+	(function(tempo, slider, column, ribbon) 
+	{
+		slider.setCallback(function() 
+		{
+			// re-render
+			tempo.renderGL();
+			
+			// update the ribbon
+			connectSliderToColumn(ribbon, slider, column);
+		});
+	})(this, slider, column, ribbon);
+
 
 	// add one variable to the column 
 	if (ADD_ALL_INTERESTING)
@@ -173,7 +264,7 @@ Tempo.prototype.getSVGSize = function()
 	};
 }
 
-Tempo.prototype.renderGL = function(gl)
+Tempo.prototype.renderGL = function()
 {
 	// initialize the shader
 	// =====================

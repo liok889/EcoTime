@@ -29,6 +29,7 @@ function RangeSlider(group, orientation, range, position, length, thickness, min
 		this.hoverColor = options.hoverColor || SLIDER_HOVER_COLOR;
 		this.dragColor = options.dragColor || SLIDER_DRAG_COLOR;
 		this.fillColor = options.fillColor;
+		this.fillOpacity = options.fillOpacity;
 		this.rx = options.rx;
 		this.ry = options.ry;
 	}
@@ -51,7 +52,8 @@ function RangeSlider(group, orientation, range, position, length, thickness, min
 			.attr("height", function() { return slider.orientation == 'vertical'   ? slider.length : slider.thickness; })
 			.attr("class", "rangeSlider")
 			.attr("rx", slider.rx).attr("ry", slider.ry)
-			.style("fill", this.fillColor || "")
+			.style("fill-opacity", slider.fillOpacity || "")
+			.style("fill", slider.fillColor || "")
 			.on("mousemove", function() { 
 				if (!SLIDER_DRAG_EVENT) {
 					d3.select(this).style("stroke", slider.hoverColor || SLIDER_HOVER_COLOR); 
@@ -113,6 +115,9 @@ function RangeSlider(group, orientation, range, position, length, thickness, min
 			})
 			.on("mousedown", function() 
 			{
+				// put slider on top (of other sliders)
+				putNodeOnTop(slider.group.node());
+
 				SLIDER_DRAG_EVENT = true;
 				slider.widget.style("stroke", slider.dragColor || SLIDER_DRAG_COLOR);
 				var mouse = d3.mouse(this);
@@ -261,6 +266,24 @@ function RangeSlider(group, orientation, range, position, length, thickness, min
 			});
 	})(this);
 
+}
+
+RangeSlider.prototype.getScreenOffset = function()
+{
+	return [this.screenOffset[0], this.screenOffset[1]];
+}
+RangeSlider.prototype.setScreenOffset = function(screenOffset)
+{
+	this.screenOffset = [screenOffset[0], screenOffset[1]];
+}
+
+RangeSlider.prototype.getPosition = function()
+{
+	return this.position;
+}
+RangeSlider.prototype.getLength = function()
+{
+	return this.length;
 }
 
 RangeSlider.prototype.removeTopEdge = function() 

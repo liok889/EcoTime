@@ -53,3 +53,9 @@ function Button(svg, x, y, w, h, img, hoverImg, callback)
 Button.prototype.setCallback = function(callback) {
 	this.callback = callback;
 }
+
+function putNodeOnTop(node)
+{
+	var n = jQuery(node);
+	n.parent().append(n.detach());
+}
