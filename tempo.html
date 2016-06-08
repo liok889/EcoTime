@@ -56,7 +56,7 @@
 		}
 
 		div.visSpace {
-			height: 800px;
+			height: 700px;
 			margin: 10px 10px;
 		}
 
@@ -70,6 +70,7 @@
 			left: 0px;
 			z-index: 100;
 			pointer-events: none;
+			border: solid 1px red;
 		}
 
 		#interactSVG {
@@ -118,9 +119,9 @@
 				    
 		void main(void) {
 
-			vec2 p = ((aVertexPosition - rangeMin) / rangeLen) * domainMin + domainLen;
+			vec2 p = ((aVertexPosition - domainMin) / domainLen) * rangeLen + rangeMin;
 			gl_Position = uPMatrix * uMVMatrix * vec4(p, 0.0, 1.0);
-			vColor = vec4(vec3(aVertexColor), aVertexColor.a * 0.65);
+			vColor = vec4(vec3(aVertexColor), aVertexColor.a * 0.8);
 			gl_PointSize = 5.0;
 		}
 	</script>
@@ -149,11 +150,20 @@
 			var w = bounding.right-bounding.left;
 			var h = bounding.bottom-bounding.top;
 
+			var canvasW = w;
+			var canvasH = h;
+			if (window.devicePixelRatio) {
+				canvasW *= window.devicePixelRatio;
+				canvasH *= window.devicePixelRatio;
+			}
+
 			// position the canvas and interaction SVG accordingly
 			var canvas = d3.select("#visCanvas")
 				.style("top", bounding.top + "px").style("left", bounding.left + "px")
-				.attr("width", w)
-				.attr("height", h);
+				.attr("width", canvasW)
+				.attr("height", canvasH)
+				.style("width", w + "px")
+				.style("height", h + "px");
 
 			// position the interaction SVG on top of the canvas
 			var interactSVG = d3.select("#interactSVG")
@@ -179,15 +189,6 @@
 			gl = d3.select("#visCanvas").node().getContext("webgl");
 		}
 		
-		/*
-		// jQuery initialization
-		$(document).ready(function() 
-		{
-			fireup();
-		});
-		*/
-
-
 	</script>
 </body>
 </html>

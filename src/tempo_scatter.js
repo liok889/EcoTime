@@ -114,8 +114,8 @@ function getGLData(glContext, xVar, yVar)
 		if (gl) 
 		{	
 			// create arrays for vertices and colors
-			var xSeries = theData.generateOneSeries(xVar);
-			var ySeries = theData.generateOneSeries(yVar);
+			var xSeries = theData.generateOneSeries(xVar).getSeries();
+			var ySeries = theData.generateOneSeries(yVar).getSeries();
 
 			var N = Math.min(xSeries.length, ySeries.length);
 

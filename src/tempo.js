@@ -20,7 +20,7 @@ var COLUMN_SPACING = 5;
 var DEF_COLUMN_VARIABLE = 'fc';
 
 // list of interesting variables to choose from
-var INTERESTING_VARS = ['PRIsn', 'LE', 'GPP', 'Tair', 'VPD'];
+var INTERESTING_VARS = ['PRIsn', 'LE', 'Tair', 'VPD'];
 var ADD_ALL_INTERESTING = true;
 
 function Tempo()
@@ -110,7 +110,13 @@ Tempo.prototype.addColumn = function()
 		thickness: TIMELINE_SLIDER_THICKNESS
 	});
 
-	
+		
+	(function(tempo, slider) {
+		slider.setCallback(function() {
+			tempo.renderGL(gl);
+		});
+	})(this, slider);
+
 	// figure out the X offset of the row
 	var xOffset = 0;
 	for (var i=0, N=this.columns.length; i<N; i++) {
@@ -133,7 +139,6 @@ Tempo.prototype.addColumn = function()
 	{
 		var varList = INTERESTING_VARS;
 		for (var i=0; i<varList.length; i++) {
-			console.log("adding: " + varList[i]);
 			column.addView(varList[i]);
 		}
 	}
@@ -175,16 +180,28 @@ Tempo.prototype.renderGL = function(gl)
 	var canvasSize = this.getSVGSize();
 
 	// initialize projection and modelview matrix
-	var projectionMatrix = makeOrtho(0, canvasSize.w, canvasSize.h, 0. -1.0, 1.0);
+	var projectionMatrix = makeOrtho(0, canvasSize.w, canvasSize.h, 0, -1.0, 1.0);
 	var mvMatrix = Matrix.I(4);
+	
+	if (window.devicePixelRatio)
+	{
+		canvasSize.w *= window.devicePixelRatio;
+		canvasSize.h *= window.devicePixelRatio;
+	}
+	gl.viewport(0, 0, canvasSize.w, canvasSize.h);
 
 	// compile shader
 	if (!this.shaderProgram) 
 	{
+		// set viewport to match canvas pixel dimensions
+		gl.clearColor(0.0, 0.0, 0.0, 0.0);
+		gl.disable(gl.DEPTH_TEST);
+
+		// shader source
 		var fragmentShader = getShader(gl, "shader-fs");
 		var vertexShader = getShader(gl, "shader-vs");
 		var shaderProgram = gl.createProgram();
-			
+
 		gl.attachShader(shaderProgram, vertexShader);
 		gl.attachShader(shaderProgram, fragmentShader);
 		gl.linkProgram(shaderProgram);
@@ -241,7 +258,6 @@ Tempo.prototype.renderGL = function(gl)
 
 		// get the time range for the slider
 		var timeRange = timeRangeFromNormalized(slider.getNormalizedRange());
-		console.log('timeRange: ' + timeRange);
 
 		// screen offset
 		var rangeMin = [
@@ -256,13 +272,17 @@ Tempo.prototype.renderGL = function(gl)
 		for (var j=0; j < views.length; j++)
 		{
 			var view = views[j];
+
 			rangeLen[1] = view.getH() - SCATTER_PAD*2
 
 			var xDomain = view.getXDomain();
 			var yDomain = view.getYDomain();
 
 			var domainMin = [xDomain[0], yDomain[0]];
-			var domainLen = [xDomain[1]-xDomain[0], yDomain[1]-yDomain[0]];
+			var domainLen = [
+				xDomain[1] - xDomain[0], 
+				yDomain[1] - yDomain[0]
+			];
 
 			// update the uniform
 			gl.uniform2fv(this.rangeMin, new Float32Array(rangeMin));
@@ -274,25 +294,30 @@ Tempo.prototype.renderGL = function(gl)
 			var glData = getGLData(gl, view.getXVar(), view.getYVar());
 
 			// determine draw range
-			var i0 = Math.max(0, glData.indicies[ timeRange[0] ]);
-			var i1 = Math.max(0, glData.indicies[ timeRange[1] ]);
-			var drawLen = i1-i0+1;
-			if (drawLen > 0) 
+			var i0 = glData.indices[ timeRange[0] ];
+			var i1 = glData.indices[ timeRange[1] ];
+			if (!(i0 == -1 && i1 == -1))
 			{
-				gl.bindBuffer(gl.ARRAY_BUFFER, glData.vertexBuffer);
-				gl.vertexAttribPointer(this.vertexPosAttrib, 2, gl.FLOAT, false, 0, 0);
+				i0 = Math.max(0, i0);
+				i1 = Math.max(0, i1);
+				var drawLen = i1-i0+1;
+				if (drawLen > 0) 
+				{
+					gl.bindBuffer(gl.ARRAY_BUFFER, glData.vertexBuffer);
+					gl.vertexAttribPointer(this.vertexPosAttrib, 2, gl.FLOAT, false, 0, 0);
 
-				gl.bindBuffer(gl.ARRAY_BUFFER, glData.colorBuffer);		
-				gl.vertexAttribPointer(this.vertexColorAttrib, 4, gl.FLOAT, false, 0, 0);
-				gl.drawArrays(gl.LINE_STRIP, i0, drawLen);
+					gl.bindBuffer(gl.ARRAY_BUFFER, glData.colorBuffer);		
+					gl.vertexAttribPointer(this.vertexColorAttrib, 4, gl.FLOAT, false, 0, 0);
+					gl.drawArrays(gl.LINE_STRIP, i0, drawLen);
+				}
 			}
 
-			// offset screen Y to the next scatter plot
-			screenOffset[1] += rangeLen[1] + SCATTER_PAD + SCATTER_SPACING;
+			// offset Y to the next scatter plot
+			rangeMin[1] += view.getH() + SCATTER_SPACING;
 		}
 
 		// run the offset
-		screenOffset[0] += COLUMN_SPACING + column.getW();
+		screenOffset[0] += column.getW() + COLUMN_SPACING;
 	}
 }
 
