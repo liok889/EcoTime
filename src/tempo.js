@@ -143,6 +143,11 @@ function connectSliderToColumn(ribbon, slider, column)
 
 Tempo.prototype.addColumn = function()
 {
+	var scatterHeights = [];
+	if (this.columns.length > 0) {
+		scatterHeights = this.columns[this.columns.length-1].column.getScatterHeights();
+	}
+
 	var sliderColor = SLIDER_DEFAULT_COLOR;
 	if (SLIDER_COLORS.length > 0) {
 		sliderColor = SLIDER_COLORS.pop();
@@ -241,16 +246,20 @@ Tempo.prototype.addColumn = function()
 	if (ADD_ALL_INTERESTING)
 	{
 		var varList = INTERESTING_VARS;
-		for (var i=0; i<varList.length; i++) {
-			column.addView(varList[i]);
+		for (var i=0; i<varList.length; i++) 
+		{
+			column.addView(varList[i], scatterHeights[i]);
+		
 		}
 	}
 	else if (INTERESTING_VARS.length > 0) 
 	{
 		// (choose at random from a list of 'interesting' variables)
 		var r = Math.floor(.5 + Math.random() * (INTERESTING_VARS.length-1));
-		column.addView(INTERESTING_VARS[r]);
+		column.addView(INTERESTING_VARS[r], scatterHeights[0]);
 	}
+
+	this.renderGL();
 }
 
 Tempo.prototype.resizeWindow = function()
@@ -276,6 +285,28 @@ Tempo.prototype.getSVGSize = function()
 	};
 }
 
+Tempo.prototype.realignColumns = function(instigator, scatterHeights)
+{
+	var xOffset = 0;
+	for (var i=0; i<this.columns.length; i++)
+	{
+		var column = this.columns[i].column;
+		if (column != instigator) 
+		{
+			column.updateScatterSize(null, column.getW(), scatterHeights);
+		}
+		column.setScreenOffset([COLUMN_X+xOffset, COLUMN_Y]);
+		column.getGroup()
+			.attr("transform", "translate(" + xOffset + "," + 0 + ")");
+		xOffset += column.getW() + COLUMN_SPACING;
+	
+		// realign ribbon
+		connectSliderToColumn(this.columns[i].ribbon, this.columns[i].slider, column)
+	}
+
+	this.renderGL();
+	
+}
 Tempo.prototype.renderGL = function()
 {
 	// initialize the shader

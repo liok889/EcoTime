@@ -7,6 +7,7 @@
 // default dimensions of the scatterplot view
 var DEF_SCATTER_W = 120;
 var DEF_SCATTER_H = 120;
+var RESIZE_RECT = 10;
 
 // padding inside the scatterplot view
 var SCATTER_PAD = 7;
@@ -14,11 +15,13 @@ var SCATTER_PAD = 7;
 // size of the text
 var VAR_TEXT_SIZE = 9;
 
-function ScatterView(group, xVar, yVar, width, height)
+function ScatterView(parentColumn, group, xVar, yVar, width, height)
 {
+	this.column = parentColumn
 	this.group = group;
 	this.xVar = xVar;
 	this.yVar = yVar;
+
 
 	// get the intersection between the two series
 	this.xSeries = theData.generateOneSeries(xVar);
@@ -28,13 +31,13 @@ function ScatterView(group, xVar, yVar, width, height)
 	this.h = height || DEF_SCATTER_H;
 
 	// create rectangle
-	this.group.append("rect")
+	this.bgRect = this.group.append("rect")
 		.attr("width", this.w)
 		.attr("height", this.h)
 		.attr("class", "scatterBorderRect");
 
 	// create variable name
-	this.vVarText = this.group.append("text")
+	this.yVarText = this.group.append("text")
 		.html(yVar)
 		.style("font-size", (1+VAR_TEXT_SIZE) + "px")
 		.attr("class", "variableName")
@@ -47,7 +50,77 @@ function ScatterView(group, xVar, yVar, width, height)
 		.attr("class", "variableName")
 		.attr("text-anchor", "middle")
 		.attr("x", this.w/2).attr("y", VAR_TEXT_SIZE);
+
+	// append a resize rectangle at the lower-left corner
+	
+	this.resizeRect = (function(group, scatterview) 
+	{
+		return group.append("rect")
+			.attr("x", scatterview.w-RESIZE_RECT)
+			.attr("y", scatterview.h-RESIZE_RECT)
+			.attr("width", RESIZE_RECT).attr("height", RESIZE_RECT)
+			.style("fill", "white").style("fill-opacity", 0.0)
+			.on("mouseover", function() {
+				d3.select(this).style("fill", '#ff9999').style("fill-opacity", 1.0);
+			})
+			.on("mouseout", function() {
+				if (!scatterview.resizing) {
+					d3.select(this).style("fill", "white").style("fill-opacity", 0.0);
+				}
+			})
+			.on("mousedown", function() {
+				d3.select('body').style('cursor', 'nwse-resize');
+				scatterview.resizing = true;
+				scatterview.lastMouse = d3.mouse(this);
+				d3.select(window).on("mousemove.resizeScatterview", function() 
+				{
+					var mouse = d3.mouse(scatterview.resizeRect.node());
+					var dMouse = [mouse[0]-scatterview.lastMouse[0], mouse[1]-scatterview.lastMouse[1]];
+					scatterview.lastMouse = mouse;
+
+					// calculate new size
+					var newW = Math.max(scatterview.w + dMouse[0],30);
+					var newH = Math.max(scatterview.h + dMouse[1],30);
+					scatterview.column.updateScatterSize(scatterview, newW, newH);
+				});
+
+				d3.select(window).on("mouseup.resizeScatterview", function() 
+				{
+					d3.select('body').style('cursor', '');
+					scatterview.resizeRect
+						.style("fill", "white").style("fill-opacity", 0.0);
+
+					scatterview.resizing = undefined;
+					d3.select(window)
+						.on("mousemove.resizeScatterview", null)
+						.on("mouseup.resizeScatterview", null);
+				})
+			});
+	})(this.group, this);
 }
+
+ScatterView.prototype.getGroup = function()
+{
+	return this.group;
+}
+
+ScatterView.prototype.updateSize = function(w, h)
+{
+	this.w = w || this.w;
+	this.h = h || this.h;
+	this.bgRect
+		.attr("width", this.w)
+		.attr("height", this.h)
+
+	this.yVarText
+		.attr("transform", "translate(" + VAR_TEXT_SIZE + "," + this.h/2 + "),rotate(-90)");
+	this.xVarText
+		.attr("x", this.w/2).attr("y", VAR_TEXT_SIZE);
+	this.resizeRect
+		.attr("x", this.w-RESIZE_RECT)
+		.attr("y", this.h-RESIZE_RECT);
+}
+
 
 ScatterView.prototype.getXVar = function()
 {

@@ -272,9 +272,11 @@ function RangeSlider(group, orientation, range, position, length, thickness, min
 
 RangeSlider.prototype.putOnTop = function()
 {
-	putNodeOnTop(this.group.node());
-	if (this.onTopCallback) {
-		this.onTopCallback();
+	if (typeof putNodeOnTop == 'function') {
+		putNodeOnTop(this.group.node());
+		if (this.onTopCallback) {
+			this.onTopCallback();
+		}
 	}
 }
 
