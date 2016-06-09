@@ -18,7 +18,7 @@ var COLUMN_SPACING = 0;
 
 // default column variable
 var DEF_COLUMN_VARIABLE = 'fc';
-var DEF_SLIDER_LENGTH = 40;
+var DEF_SLIDER_LENGTH = 60;
 var DEF_SLIDER_MIN_LENGTH = 15;
 
 // list of interesting variables to choose from
@@ -166,7 +166,7 @@ Tempo.prototype.addColumn = function()
 	var sliderPos = lastSlider;
 	if (sliderLen < DEF_SLIDER_MIN_LENGTH) {
 		// pick up random position
-		sliderPosition = Math.floor(Math.random() * (this.timelineW-DEF_SLIDER_LENGTH-10));
+		sliderPos = Math.floor(Math.random() * (this.timelineW-DEF_SLIDER_LENGTH-10));
 		sliderLen = DEF_SLIDER_LENGTH;
 	}
 
