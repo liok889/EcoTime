@@ -140,6 +140,12 @@
 
 		function resizeWindow()
 		{
+			// maximize div.visSpace
+			var visSpace = d3.select('div.visSpace');
+			var visSpaceBounds = visSpace.node().getBoundingClientRect();
+			visSpace.style("height", (window.innerHeight-visSpaceBounds.top-10) + 'px');
+			console.log("window.innerHeight: " + window.innerHeight + ", visSpaceH: " + visSpace.style('height'));
+
 			var visSVG = document.getElementById('visSVG');
 			var bounding = visSVG.getBoundingClientRect();
 			var w = bounding.right-bounding.left;

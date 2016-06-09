@@ -108,7 +108,6 @@ var SLIDER_COLORS = [
 	'#ccebc5',
 	'#decbe4',
 	'#fed9a6',
-	'#ffffcc'
 ].reverse();
 var SLIDER_DEFAULT_COLOR = "#cccccc";
 
