@@ -113,48 +113,26 @@
 		uniform vec2 rangeLen;
 		uniform vec2 domainMin;
 		uniform vec2 domainLen;
-
-		// position of the point
-		varying lowp vec2 pointPos;
 		    
 		void main(void) 
 		{
 			vec2 p = ((aVertexPosition - domainMin) / domainLen) * rangeLen + rangeMin;
 			gl_Position = uPMatrix * uMVMatrix * vec4(p, 0.0, 1.0);
-			pointPos = p;
 			
 			// the size of the point
-			gl_PointSize = 10.0;
+			gl_PointSize = 15.0;
 		}
 
 	</script>
 
 	<script id="shader-fs-points" type="x-shader/x-fragment">
-		precision lowp float;
-		varying lowp vec2 pointPos;
-
-		void main(void) 
+		precision mediump float;
+		
+		void main() 
 		{
-			vec2 disp = gl_FragCoord.xy - pointPos;
-			float distSquared = dot(disp, disp);
-			
-			if (distSquared <= 25.0)
-			{
-				gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
-			}
-			else
-			{
-				discard;
-			}
-			/*
-			gl_FragColor = mix( 
-				vec4(0.0, 0.0, 0.0, 0.15), vec4(1.0, 1.0, 1.0, 0.0),
-				smoothstep(25.0-2.5, 25.0+2.5, distSquared)
-			);
-			*/
-			
-			//gl_FragColor = vec4(0.0, 0.0, 0.0, 0.15);
-
+			float dist = distance( gl_PointCoord, vec2(0.5) );
+			float alpha = 1.0 - smoothstep(0.45,0.5,dist);
+			gl_FragColor = vec4(0,0,0,alpha * 0.10);
 		}
 	</script>
 
