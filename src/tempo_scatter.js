@@ -27,7 +27,6 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height)
 	this.xVar = xVar;
 	this.yVar = yVar;
 
-
 	// get the intersection between the two series
 	this.xSeries = theData.generateOneSeries(xVar);
 	this.ySeries = theData.generateOneSeries(yVar);
@@ -60,7 +59,13 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height)
 				);
 				selectionDiv.setCallbacks(function(varName) 
 				{
-					scatterview.setYVar(varName);
+					if (shiftKey) {
+						tempo.setYVar(scatterview.matrixIndex[1], varName);
+					}
+					else
+					{
+						scatterview.setYVar(varName);
+					}
 				});
 			})
 			.on("mouseover", function() {
@@ -86,7 +91,12 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height)
 				);
 				selectionDiv.setCallbacks(function(varName) 
 				{
-					scatterview.setXVar(varName);
+					if (shiftKey) {
+						tempo.setXVar(scatterview.matrixIndex[0], varName);
+					}
+					else {
+						scatterview.setXVar(varName);
+					}
 				});
 			})
 			.on("mouseover", function() {
@@ -146,6 +156,15 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height)
 	})(this.group, this);
 }
 
+ScatterView.prototype.setMatrixIndex = function(index)
+{
+	this.matrixIndex = [index[0], index[1]];
+}
+ScatterView.prototype.getMatrixIndex = function()
+{
+	return this.matrixIndex;
+}
+
 ScatterView.prototype.getGroup = function()
 {
 	return this.group;
@@ -169,14 +188,14 @@ ScatterView.prototype.updateSize = function(w, h)
 }
 
 
-ScatterView.prototype.setXVar = function(xVar)
+ScatterView.prototype.setXVar = function(xVar, dontRender)
 {
 	this.xVar = xVar;
 	this.xVarText.html(xVar);
 	this.xSeries = theData.generateOneSeries(xVar);
 	tempo.renderGL();
 }
-ScatterView.prototype.setYVar = function(yVar)
+ScatterView.prototype.setYVar = function(yVar, dontRender)
 {
 	this.yVar = yVar;
 	this.yVarText.html(yVar);

@@ -92,9 +92,10 @@
 
 	<!-- upper div -->
 	<div width="100%" style="padding: 5px 5px">
-		<input id="checkShowPoints" type="checkbox" onclick="scatterVisibility()">Show points &nbsp;
-		<input id="checkShowLines" type="checkbox" onclick="scatterVisibility()">Show lines
+		<input id="checkShowPoints" type="checkbox" onclick="scatterOptions()">Show points &nbsp;
+		<input id="checkShowLines" type="checkbox" onclick="scatterOptions()">Show lines
 	</div>
+
 	<!-- visualization space -->
 	<div class="visSpace" width="100%">
 		<svg id="visSVG" width="100%" height="100%"></svg>
@@ -185,10 +186,16 @@
 			'data/EcoSpec_Summer_2015_GPP_Reco_data_new_DOY-shifted.csv',
 			'data/Decagon_NDVI_&_PRI_02-27-2017_30min.csv'
 		];
+		
+		// the data, visualization object (tempo), and gl context
 		var theData = new EcoTimeseries(TIMESERIES_DATA, dataReady);
+		var tempo = null;
 		var gl = null;
 
-		function scatterVisibility()
+		// states
+		var shiftKey = false;
+
+		function scatterOptions()
 		{
 			SHOW_SCATTER_POINTS = d3.select("#checkShowPoints").node().checked;
 			SHOW_SCATTER_LINES = d3.select("#checkShowLines").node().checked;
@@ -242,6 +249,16 @@
 			d3.select("#checkShowPoints").node().checked = SHOW_SCATTER_POINTS;
 			d3.select("#checkShowLines").node().checked = SHOW_SCATTER_LINES;
 	
+			d3.select('body')
+				.on("keydown", function() {
+					if (event.keyCode == 16) {
+						shiftKey = true;
+					}
+				}).on("keyup", function() {
+					if (event.keyCode == 16) {
+						shiftKey = false;
+					}
+				});
 		}
 
 		// fire up things

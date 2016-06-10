@@ -47,6 +47,8 @@ TimeColumn.prototype.addView = function(varName, scatterHeight)
 
 	var scatterView = new ScatterView(this, group, this.columnVariable, varName, this.w, scatterHeight);
 	this.views.push(scatterView);
+
+	return this.views[ this.views.length-1 ];
 }
 
 TimeColumn.prototype.getScatterHeights = function()

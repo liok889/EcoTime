@@ -64,10 +64,6 @@ function Shader(gl, vertexSource, fragmentSource, attributes, uniforms)
 {
 	// shader source
 	var shaderProgram = gl.createProgram();
-
-	console.log("vertexSource: " + vertexSource);
-	console.log("fragmentSource: " + fragmentSource);
-	
 	gl.attachShader(shaderProgram, vertexSource);
 	gl.attachShader(shaderProgram, fragmentSource);
 	gl.linkProgram(shaderProgram);
@@ -84,7 +80,6 @@ function Shader(gl, vertexSource, fragmentSource, attributes, uniforms)
 
 			var attribLocation = gl.getAttribLocation(shaderProgram, attributes[i]);
 			attribMap[ attributes[i] ] = attribLocation;
-			console.log('attrib [' + attributes[i] + ']: ' + attribMap[ attributes[i] ]);
 		}
 		
 		for (var i=0; i<uniforms.length; i++) {

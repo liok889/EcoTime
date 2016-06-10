@@ -227,6 +227,7 @@ Tempo.prototype.addColumn = function()
 		slider: slider,
 		ribbon: ribbon,
 	});
+	var columnIndex = this.columns.length-1;
 
 	// slider to callback
 	(function(tempo, slider, column, ribbon) 
@@ -252,22 +253,45 @@ Tempo.prototype.addColumn = function()
 		var varList = INTERESTING_VARS;
 		for (var i=0; i<varList.length; i++) 
 		{
-			column.addView(varList[i], scatterHeights[i]);
-		
+			var view = column.addView(varList[i], scatterHeights[i]);
+			view.setMatrixIndex([columnIndex, i]);
 		}
-	}
-	else if (INTERESTING_VARS.length > 0) 
-	{
-		// (choose at random from a list of 'interesting' variables)
-		var r = Math.floor(.5 + Math.random() * (INTERESTING_VARS.length-1));
-		column.addView(INTERESTING_VARS[r], scatterHeights[0]);
 	}
 
 	this.renderGL();
 }
 
+
+Tempo.prototype.setXVar = function(columnIndex, xVar)
+{
+	var column = this.columns[columnIndex].column;
+	var views = column.getViews();
+	for (var i=0; i<views.length; i++) {
+		views[i].setXVar(xVar, true)
+	}
+
+	// re-render
+	this.renderGL();
+}
+
+
+Tempo.prototype.setYVar = function(rowIndex, yVar)
+{
+	for (var i=0; i<this.columns.length; i++) {
+		var column = this.columns[i].column;
+		var view = column.getViews()[rowIndex];
+		view.setYVar(yVar, true);
+	}
+	INTERESTING_VARS[rowIndex] = yVar;
+
+	// re-render
+	this.renderGL();
+}
+
+
 Tempo.prototype.resizeWindow = function()
 {
+	/*
 	var svgSize = this.getSVGSize();
 	var w = svgSize.w;
 	var h = svgSize.h;
@@ -276,6 +300,7 @@ Tempo.prototype.resizeWindow = function()
 
 	this.timeline.attr("x2", this.timelineW);
 	this.timelineCircles[1].attr("cx", this.timelineW+TIMELINE_END_R);
+	*/
 }
 
 Tempo.prototype.getSVGSize = function()
