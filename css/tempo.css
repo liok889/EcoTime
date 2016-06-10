@@ -57,3 +57,11 @@ rect.scatterBorderRect {
 	user-select: none;
 	cursor: default;
 }
+
+.timeAxis text {font-family: Helvetica, sans-serif; font-size: 10px;}
+.timeAxis line,
+.timeAxis path {
+	fill: none;
+	stroke: #000;
+	shape-rendering: crispEdges;
+}

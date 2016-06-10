@@ -4,12 +4,12 @@
  * =============================================
  */
 
-var TIMELINE_X = 35;
-var TIMELINE_Y = 25;
+var TIMELINE_X = 45;
+var TIMELINE_Y = 21;
 var TIMELINE_MAX_W = 800;
 var TIMELINE_END_R = 3;
 var BUTTON_W = 20, BUTTON_H = 20;
-var TIMELINE_SLIDER_THICKNESS = 25;
+var TIMELINE_SLIDER_THICKNESS = 15;
 
 // offset of the column view
 var COLUMN_X = 10;
@@ -18,7 +18,7 @@ var COLUMN_SPACING = 0;
 
 // default column variable
 var DEF_COLUMN_VARIABLE = 'fc';
-var DEF_SLIDER_LENGTH = 60;
+var DEF_SLIDER_LENGTH = 75;
 var DEF_SLIDER_MIN_LENGTH = 15;
 
 // list of interesting variables to choose from
@@ -29,6 +29,7 @@ var SLIDER_OPACITY = 0.8;
 // default visibility
 var SHOW_SCATTER_POINTS = true;
 var SHOW_SCATTER_LINES = false;
+var SHOW_TIME_AXIS = true;
 
 function Tempo()
 {
@@ -51,15 +52,17 @@ Tempo.prototype.init = function()
 	var w = svgSize.w;
 	var h = svgSize.h;
 
-	// ribbon group: connect the slider to their TimeColumn
-	this.ribbonGroup = this.vis.append("g")
-		.attr("class", "ribbonGroup");
+
 
 	// make the timeline
 	group = this.vis.append("g")
 		.attr("class", "timelineGroup")
 		.attr("transform", "translate(" + TIMELINE_X + "," + TIMELINE_Y + ")");
-		
+
+	// ribbon group: connect the slider to their TimeColumn
+	this.ribbonGroup = this.vis.append("g")
+		.attr("class", "ribbonGroup");
+
 	// a line that represents the timeline
 	var timelineW = Math.min(TIMELINE_MAX_W, w - 2*TIMELINE_X);
 
@@ -68,29 +71,53 @@ Tempo.prototype.init = function()
 		.style("stroke", "#444444")
 		.attr("x1", 0).attr("y1", 0)
 		.attr("x2", timelineW).attr("y1", 0);
+	
+	if (SHOW_TIME_AXIS) 
+	{
+		var timeScale = d3.time.scale()
+			.domain([theData.getStartDate(), theData.getEndDate()])
+			.range([0, timelineW ]);
+
+		var timeAxis = d3.svg.axis()
+			.scale(timeScale)
+			.orient('top')
+			.tickFormat(d3.time.format('%m/%d'))
+			.tickSize(2);
+
+		group.append('g')
+			.attr('class', 'timeAxis')
+			.call(timeAxis);
+	}
 
 	// two circles at either end of the line
 	var c1 = group.append("circle")
 		.attr("r", TIMELINE_END_R + "px")
 		.attr("class", "timeline")
-		.attr("cx", -TIMELINE_END_R).attr("cy", 0);
+		.attr("cx", -TIMELINE_END_R+2).attr("cy", 0);
 	
 	var c2 = group.append("circle")
 		.attr("r", TIMELINE_END_R + "px")
 		.attr("class", "timeline")
-		.attr("cx", timelineW+TIMELINE_END_R).attr("cy", 0);
+		.attr("cx", timelineW+TIMELINE_END_R-2).attr("cy", 0);
 
 	this.timeline = timeline;
 	this.timelineCircles = [c1, c2];
 	this.timelineGroup = group;
 
 	// 'add view' button
-	this.addViewButton = (function(tempo) {
-		return new Button(tempo.vis,
-			5, TIMELINE_Y-BUTTON_H/2, BUTTON_W, BUTTON_H,
+	(function(tempo) {
+		tempo.addViewButton = new Button(tempo.vis,
+			5, TIMELINE_Y-10-BUTTON_H/2, BUTTON_W, BUTTON_H,
 			"assets/add.png", "assets/add_hover.png", function() {
 				tempo.addColumn();
 			});
+		
+		tempo.addViewButton = new Button(tempo.vis,
+			5, TIMELINE_Y-10-BUTTON_H/2 + BUTTON_H+1, BUTTON_W, BUTTON_H,
+			"assets/delete.png", "assets/delete_hover.png", function() {
+				tempo.removeColumn();
+			});
+
 	})(this);
 
 	// store timeline width
@@ -136,9 +163,10 @@ function connectSliderToColumn(ribbon, slider, column)
 		return d;	 
 	}
 
+	var sliderOffset = slider.getScreenOffset();
 	var p1 = [
-		TIMELINE_X + slider.getPosition() + slider.getLength()/2,
-		TIMELINE_Y + TIMELINE_SLIDER_THICKNESS/2+1
+		sliderOffset[0] + TIMELINE_X + slider.getPosition() + slider.getLength()/2,
+		sliderOffset[1] + TIMELINE_Y + TIMELINE_SLIDER_THICKNESS/2+1
 	];
 	var p2 = column.getScreenOffset();
 	p2[0] += column.getW()/2;
@@ -176,6 +204,9 @@ Tempo.prototype.addColumn = function()
 	}
 
 	// add a slider to this column
+	var sliderOffset = [0, 0];
+	sliderOffset[1] += 1+TIMELINE_SLIDER_THICKNESS/2 //+ TIMELINE_SLIDER_THICKNESS/2*this.columns.length;
+
 	var slider = new RangeSlider(this.sliderGroup, {
 		orientation: "horizontal",
 		range: [0, this.timelineW],
@@ -187,6 +218,7 @@ Tempo.prototype.addColumn = function()
 		fillColor: sliderColor,
 		hoverColor: '#777777',
 		dragColor: '#ff5050',
+		screenOffset: sliderOffset,
 		thickness: TIMELINE_SLIDER_THICKNESS
 	});
 
@@ -261,6 +293,23 @@ Tempo.prototype.addColumn = function()
 	this.renderGL();
 }
 
+Tempo.prototype.removeColumn = function()
+{
+	if (this.columns.length > 0) 
+	{
+		var column = this.columns.pop();
+		column.column.getGroup().remove();
+		
+		// return color to be re-used again
+		var sliderColor = column.slider.getFillColor();
+		if (sliderColor !== undefined && sliderColor !== SLIDER_DEFAULT_COLOR) {
+			SLIDER_COLORS.push(sliderColor);
+		}
+		column.slider.remove();
+		column.ribbon.remove();
+		this.renderGL();
+	}
+}
 
 Tempo.prototype.setXVar = function(columnIndex, xVar)
 {

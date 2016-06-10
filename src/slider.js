@@ -32,6 +32,12 @@ function RangeSlider(group, orientation, range, position, length, thickness, min
 		this.fillOpacity = options.fillOpacity;
 		this.rx = options.rx;
 		this.ry = options.ry;
+
+		if (options.screenOffset) 
+		{
+			this.screenOffset = [options.screenOffset[0], options.screenOffset[1]];
+			this.group.attr("transform", "translate(" + this.screenOffset[0] + "," + this.screenOffset[1] + ")");
+		}
 	}
 	else
 	{
@@ -267,7 +273,11 @@ function RangeSlider(group, orientation, range, position, length, thickness, min
 					});
 			});
 	})(this);
+}
 
+RangeSlider.prototype.getFillColor = function()
+{
+	return this.fillColor;
 }
 
 RangeSlider.prototype.putOnTop = function()
@@ -282,8 +292,10 @@ RangeSlider.prototype.putOnTop = function()
 
 RangeSlider.prototype.getScreenOffset = function()
 {
-	return [this.screenOffset[0], this.screenOffset[1]];
+	return this.screenOffset ? 
+		[this.screenOffset[0], this.screenOffset[1]] : [0, 0];
 }
+
 RangeSlider.prototype.setScreenOffset = function(screenOffset)
 {
 	this.screenOffset = [screenOffset[0], screenOffset[1]];
@@ -296,6 +308,11 @@ RangeSlider.prototype.getPosition = function()
 RangeSlider.prototype.getLength = function()
 {
 	return this.length;
+}
+
+RangeSlider.prototype.remove = function()
+{
+	this.group.remove();
 }
 
 RangeSlider.prototype.removeTopEdge = function() 
