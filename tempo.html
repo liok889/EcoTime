@@ -55,7 +55,7 @@
 
 		div.visSpace {
 			height: 700px;
-			margin: 10px 10px;
+			margin: 5px 5px;
 		}
 
 		#visSVG {
@@ -90,6 +90,11 @@
 		<b>Tempo</b> - Visualization of (many) time series
 	</div>
 
+	<!-- upper div -->
+	<div width="100%" style="padding: 5px 5px; border: 1px solid red">
+		<input id="checkShowPoints" type="checkbox" onclick="scatterVisibility()">Show points &nbsp;
+		<input id="checkShowLines" type="checkbox" onclick="scatterVisibility()">Show lines
+	</div>
 	<!-- visualization space -->
 	<div class="visSpace" width="100%">
 		<svg id="visSVG" width="100%" height="100%"></svg>
@@ -97,9 +102,9 @@
 		<svg id="interactSVG" width="0" height="0"></svg>
 	</div>
 
-	<script id="shader-vs" type="x-shader/x-vertex">
+	<!-- scatterplot points shader -->
+	<script id="shader-vs-points" type="x-shader/x-vertex">
 		attribute vec2 aVertexPosition;
-		attribute vec4 aVertexColor;   
 
 		uniform mat4 uMVMatrix;
 		uniform mat4 uPMatrix;
@@ -109,22 +114,80 @@
 		uniform vec2 domainMin;
 		uniform vec2 domainLen;
 
+		// position of the point
+		varying lowp vec2 pointPos;
+		    
+		void main(void) 
+		{
+			vec2 p = ((aVertexPosition - domainMin) / domainLen) * rangeLen + rangeMin;
+			gl_Position = uPMatrix * uMVMatrix * vec4(p, 0.0, 1.0);
+			pointPos = p;
+			
+			// the size of the point
+			gl_PointSize = 10.0;
+		}
+
+	</script>
+
+	<script id="shader-fs-points" type="x-shader/x-fragment">
+		precision lowp float;
+		varying lowp vec2 pointPos;
+
+		void main(void) 
+		{
+			vec2 disp = gl_FragCoord.xy - pointPos;
+			float distSquared = dot(disp, disp);
+			
+			if (distSquared <= 25.0)
+			{
+				gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+			}
+			else
+			{
+				discard;
+			}
+			/*
+			gl_FragColor = mix( 
+				vec4(0.0, 0.0, 0.0, 0.15), vec4(1.0, 1.0, 1.0, 0.0),
+				smoothstep(25.0-2.5, 25.0+2.5, distSquared)
+			);
+			*/
+			
+			//gl_FragColor = vec4(0.0, 0.0, 0.0, 0.15);
+
+		}
+	</script>
+
+
+	<!-- connected scatterplot shader -->
+	<script id="shader-vs-lines" type="x-shader/x-vertex">
+		attribute vec2 aVertexPosition;
+		attribute vec4 aVertexColor;   
+		uniform mat4 uMVMatrix;
+		uniform mat4 uPMatrix;
+		uniform vec2 rangeMin;
+		uniform vec2 rangeLen;
+		uniform vec2 domainMin;
+		uniform vec2 domainLen;
 		// color
 		varying lowp vec4 vColor;
 				    
 		void main(void) {
-
 			vec2 p = ((aVertexPosition - domainMin) / domainLen) * rangeLen + rangeMin;
 			gl_Position = uPMatrix * uMVMatrix * vec4(p, 0.0, 1.0);
 			vColor = vec4(vec3(aVertexColor), aVertexColor.a * 0.8);
 			gl_PointSize = 5.0;
 		}
 	</script>
-	<script id="shader-fs" type="x-shader/x-fragment">
+
+	<script id="shader-fs-lines" type="x-shader/x-fragment">
 		varying lowp vec4 vColor;
 		void main(void) {
 			gl_FragColor = vColor;
 		}
+	</script>
+
+
 	</script>
 
 
@@ -137,6 +200,12 @@
 		];
 		var theData = new EcoTimeseries(TIMESERIES_DATA, dataReady);
 		var gl = null;
+
+		function scatterVisibility()
+		{
+			SHOW_SCATTER_POINTS = d3.select("#checkShowPoints").node().checked;
+			SHOW_SCATTER_LINES = d3.select("#checkShowLines").node().checked;
+		}
 
 		function resizeWindow()
 		{
@@ -178,18 +247,28 @@
 			}
 		}
 		window.onresize = resizeWindow;
-		
+
+		function initUI()
+		{
+			resizeWindow();
+			d3.select("#checkShowPoints").node().checked = SHOW_SCATTER_POINTS;
+			d3.select("#checkShowLines").node().checked = SHOW_SCATTER_LINES;
+	
+		}
+
 		// fire up things
 		function dataReady() 
 		{
 			// get gl context
 			gl = d3.select("#visCanvas").node().getContext("webgl");
 
-			resizeWindow();
+			// initialize UI
+			initUI();
 
 			// initialize the vis
 			tempo = new Tempo();
-	
+
+
 		}
 		
 	</script>

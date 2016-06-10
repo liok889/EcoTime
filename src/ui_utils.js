@@ -59,3 +59,96 @@ function putNodeOnTop(node)
 	var n = jQuery(node);
 	n.parent().append(n.detach());
 }
+
+function Shader(gl, vertexSource, fragmentSource, attributes, uniforms)
+{
+	// shader source
+	var shaderProgram = gl.createProgram();
+
+	console.log("vertexSource: " + vertexSource);
+	console.log("fragmentSource: " + fragmentSource);
+	
+	gl.attachShader(shaderProgram, vertexSource);
+	gl.attachShader(shaderProgram, fragmentSource);
+	gl.linkProgram(shaderProgram);
+
+	// if creating the program failed, alert,
+	if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+		alert("Unable to initialize the shader program: " + gl.getProgramInfoLog(shaderProgram));
+		return null;
+	}
+	else
+	{
+		var attribMap = {}, uniformMap = {};
+		for (var i=0; i<attributes.length; i++) {
+
+			var attribLocation = gl.getAttribLocation(shaderProgram, attributes[i]);
+			attribMap[ attributes[i] ] = attribLocation;
+			console.log('attrib [' + attributes[i] + ']: ' + attribMap[ attributes[i] ]);
+		}
+		
+		for (var i=0; i<uniforms.length; i++) {
+			var uniformLocation = gl.getUniformLocation(shaderProgram, uniforms[i]);
+			uniformMap[ uniforms[i] ] = uniformLocation;
+		}
+		
+		// store attribute/uniform list/maps
+		this.attribList = attributes;
+		this.uniformList = uniforms;
+
+		this.attribMap = attribMap;
+		this.uniformMap = uniformMap;
+
+		// reference to shader program
+		this.shaderProgram = shaderProgram;
+
+		// and WebGL context
+		this.gl = gl;
+	}
+}
+
+Shader.prototype.isOK = function()
+{
+	return this.shaderProgram !== undefined;
+}
+Shader.prototype.useShaderNoBind = function()
+{
+	var gl = this.gl;
+	gl.useProgram(this.shaderProgram);	
+}
+Shader.prototype.useShader = function()
+{
+	var gl = this.gl;
+	gl.useProgram(this.shaderProgram);
+
+	// enable attributes
+	for (var i=0; i<this.attribList.length; i++) {
+		gl.enableVertexAttribArray(this.attribMap[this.attribList[i]]);
+	}
+}
+Shader.prototype.unuseShader = function()
+{
+	var gl = this.gl;
+
+	// enable attributes
+	for (var i=0; i<this.attribList.length; i++) {
+		gl.disableVertexAttribArray(this.attribMap[this.attribList[i]]);
+	}
+}
+
+Shader.prototype.attrib = function(attribName)
+{
+	return this.attribMap[attribName];
+}
+
+Shader.prototype.uniform = function(uniformName)
+{
+	return this.uniformMap[uniformName];
+}
+
+Shader.prototype.attrib2buffer = function(attribName, vertexBuffer, size)
+{
+	this.gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+	this.gl.vertexAttribPointer(this.attribMap[attribName], size, gl.FLOAT, false, 0, 0);
+}
+

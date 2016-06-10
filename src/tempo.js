@@ -25,6 +25,11 @@ var DEF_SLIDER_MIN_LENGTH = 15;
 var INTERESTING_VARS = ['PRIsn', 'LE', 'Tair', 'VPD'];
 var ADD_ALL_INTERESTING = true;
 var SLIDER_OPACITY = 0.8;
+
+// default visibility
+var SHOW_SCATTER_POINTS = true;
+var SHOW_SCATTER_LINES = false;
+
 function Tempo()
 {
 	this.vis = d3.select("#visSVG");
@@ -321,62 +326,54 @@ Tempo.prototype.renderGL = function()
 		canvasSize.w *= window.devicePixelRatio;
 		canvasSize.h *= window.devicePixelRatio;
 	}
+	// set blending, clear color, and disable depth test
+	gl.clearColor(0.0, 0.0, 0.0, 0.0);
+	gl.disable(gl.DEPTH_TEST);
+	gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+
+	// viewport
 	gl.viewport(0, 0, canvasSize.w, canvasSize.h);
 
-	// compile shader
-	if (!this.shaderProgram) 
+	// line size
+	gl.lineWidth(2.0);
+
+	// initialize shader
+	if (!this.linesShader) 
 	{
-		// set viewport to match canvas pixel dimensions
-		gl.clearColor(0.0, 0.0, 0.0, 0.0);
-		gl.disable(gl.DEPTH_TEST);
+		this.linesShader = new Shader(gl,
+			getShader(gl, 'shader-vs-lines'),
+			getShader(gl, 'shader-fs-lines'), 
+			['aVertexPosition', 'aVertexColor'],
+			['uPMatrix', 'uMVMatrix', 'rangeMin', 'rangeLen', 'domainMin', 'domainLen']
+		);
+	}
 
-		// shader source
-		var fragmentShader = getShader(gl, "shader-fs");
-		var vertexShader = getShader(gl, "shader-vs");
-		var shaderProgram = gl.createProgram();
-
-		gl.attachShader(shaderProgram, vertexShader);
-		gl.attachShader(shaderProgram, fragmentShader);
-		gl.linkProgram(shaderProgram);
-
-		// if creating the program failed, alert,
-		if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
-			alert("Unable to initialize the shader program: " + gl.getProgramInfoLog(shaderProgram));
-		}
-		else
-		{
-			// get vertex attributes
-			this.vertexPosAttrib = gl.getAttribLocation(shaderProgram, 'aVertexPosition');
-			gl.enableVertexAttribArray(this.vertexPosAttrib);
-
-			this.vertexColorAttrib = gl.getAttribLocation(shaderProgram, 'aVertexColor');
-			gl.enableVertexAttribArray(this.vertexColorAttrib);
-				
-			// matrix uniforms
-			this.pUniform = gl.getUniformLocation(shaderProgram, 'uPMatrix');
-			this.mvUniform = gl.getUniformLocation(shaderProgram, 'uMVMatrix');
-
-			// range / domain variables
-			this.rangeMin = gl.getUniformLocation(shaderProgram, "rangeMin");
-			this.rangeLen = gl.getUniformLocation(shaderProgram, "rangeLen");
-			this.domainMin = gl.getUniformLocation(shaderProgram, "domainMin");
-			this.domainLen = gl.getUniformLocation(shaderProgram, "domainLen");
-
-			// store shader program
-			this.shaderProgram = shaderProgram;
-		}
+	if (!this.pointsShader) 
+	{
+		this.pointsShader = new Shader(gl,
+			getShader(gl, 'shader-vs-points'),
+			getShader(gl, 'shader-fs-points'), 
+			['aVertexPosition'],
+			['uPMatrix', 'uMVMatrix', 'rangeMin', 'rangeLen', 'domainMin', 'domainLen']
+		);
 	}
 
 	// clear
 	gl.clear(gl.COLOR_BUFFER_BIT);
 
 	// use the shader
-	gl.useProgram(this.shaderProgram);
-	gl.lineWidth(2.0);
+	var ls = this.linesShader;
+	var ps = this.pointsShader;
+
+	ls.useShaderNoBind();
+	gl.uniformMatrix4fv(ls.uniform('uPMatrix'), false, new Float32Array(projectionMatrix.flatten()));
+	gl.uniformMatrix4fv(ls.uniform('uMVMatrix'), false, new Float32Array(mvMatrix.flatten()));
+
+	ps.useShaderNoBind();
+	gl.uniformMatrix4fv(ps.uniform('uPMatrix'), false, new Float32Array(projectionMatrix.flatten()));
+	gl.uniformMatrix4fv(ps.uniform('uMVMatrix'), false, new Float32Array(mvMatrix.flatten()));
 
 	// update uniforms (projection and modelview matrices)
-	gl.uniformMatrix4fv(this.pUniform, false, new Float32Array(projectionMatrix.flatten()));
-	gl.uniformMatrix4fv(this.mvUniform, false, new Float32Array(mvMatrix.flatten()));
 
 	// loop through all columns and render them
 	// =========================================
@@ -417,12 +414,6 @@ Tempo.prototype.renderGL = function()
 				yDomain[1] - yDomain[0]
 			];
 
-			// update the uniform
-			gl.uniform2fv(this.rangeMin, new Float32Array(rangeMin));
-			gl.uniform2fv(this.rangeLen, new Float32Array(rangeLen));
-			gl.uniform2fv(this.domainMin, new Float32Array(domainMin));
-			gl.uniform2fv(this.domainLen, new Float32Array(domainLen));
-			
 			// render
 			var glData = getGLData(gl, view.getXVar(), view.getYVar());
 
@@ -436,12 +427,38 @@ Tempo.prototype.renderGL = function()
 				var drawLen = i1-i0+1;
 				if (drawLen > 0) 
 				{
-					gl.bindBuffer(gl.ARRAY_BUFFER, glData.vertexBuffer);
-					gl.vertexAttribPointer(this.vertexPosAttrib, 2, gl.FLOAT, false, 0, 0);
+					// update the uniform
+					if (SHOW_SCATTER_POINTS)
+					{
+						gl.enable(gl.BLEND);
+						ps.useShader();
+						gl.uniform2fv(ps.uniform('rangeMin'), new Float32Array(rangeMin));
+						gl.uniform2fv(ps.uniform('rangeLen'), new Float32Array(rangeLen));
+						gl.uniform2fv(ps.uniform('domainMin'), new Float32Array(domainMin));
+						gl.uniform2fv(ps.uniform('domainLen'), new Float32Array(domainLen));
+						
+						ps.attrib2buffer('aVertexPosition', glData.vertexBuffer, 2);
+						gl.drawArrays(gl.POINTS, i0, drawLen);
 
-					gl.bindBuffer(gl.ARRAY_BUFFER, glData.colorBuffer);		
-					gl.vertexAttribPointer(this.vertexColorAttrib, 4, gl.FLOAT, false, 0, 0);
-					gl.drawArrays(gl.LINE_STRIP, i0, drawLen);
+						ps.unuseShader();
+						gl.disable(gl.BLEND);
+					}
+				
+					if (SHOW_SCATTER_LINES)
+					{
+						// update the uniform
+						ls.useShader();
+						gl.uniform2fv(ls.uniform('rangeMin'), new Float32Array(rangeMin));
+						gl.uniform2fv(ls.uniform('rangeLen'), new Float32Array(rangeLen));
+						gl.uniform2fv(ls.uniform('domainMin'), new Float32Array(domainMin));
+						gl.uniform2fv(ls.uniform('domainLen'), new Float32Array(domainLen));
+
+						ls.attrib2buffer('aVertexPosition', glData.vertexBuffer, 2);
+						ls.attrib2buffer('aVertexColor', glData.colorBuffer, 4);
+						gl.drawArrays(gl.LINE_STRIP, i0, drawLen);
+
+						ls.unuseShader();
+					}
 				}
 			}
 
