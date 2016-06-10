@@ -8,9 +8,11 @@
 
 	<link href='https://fonts.googleapis.com/css?family=Lato:400,300,700' rel='stylesheet' type='text/css'>
 	<link href='https://fonts.googleapis.com/css?family=Anonymous+Pro:400,700' rel='stylesheet' type='text/css'>
+	<link href="lib/jquery-ui.css" rel="stylesheet" type="text/css">
 
 	<script src="lib/d3.min.js" charset="utf-8"></script>
 	<script src="lib/jquery.min.js"></script>
+	<script src="lib/jquery-ui.js"></script>
 
 	<!-- local libraries -->
 	<script src='lib/papaparse.min.js' type='text/javascript'></script>
@@ -34,7 +36,7 @@
 		body {
 			font-family: 'Lato', 'Helvetica', sans-serif;
 			font-weight: 300;
-			font-size: 12px;
+			font-size: 11px;
 			margin: 0px 0px;
 			-webkit-touch-callout: none;
 			-webkit-user-select: none;
@@ -44,7 +46,13 @@
 			user-select: none;
 			cursor: default;
 		}
-
+		.slider {
+			font-size: 10px;
+			padding-left: 10px;
+			width: 50px;
+			height: 6px;
+			display: inline-block;
+		}
 		div.appTitle {
 			font-size: 17px;
 			font-weight: 400;
@@ -92,8 +100,21 @@
 
 	<!-- upper div -->
 	<div width="100%" style="padding: 5px 5px">
-		<input id="checkShowPoints" type="checkbox" onclick="scatterOptions()">Show points &nbsp;
-		<input id="checkShowLines" type="checkbox" onclick="scatterOptions()">Show lines
+		<div style="display: inline-block">
+			<div style="display: inline-block">
+				<input id="checkShowPoints" type="checkbox" onclick="scatterOptions()">Show points |
+			</div>
+			&nbsp;size&nbsp;&nbsp;<div class="slider" id="sliderPointSize"></div>
+			
+			&nbsp;opacity&nbsp;&nbsp;<div class="slider" id="sliderPointOpacity"></div>
+		</div>
+		
+		<div style="display: inline-block">
+			<div style="display: inline-block">
+				<input id="checkShowLines" type="checkbox" onclick="scatterOptions()">Show lines |
+			</div>
+			&nbsp;width&nbsp;&nbsp;<div id="sliderLineWidth" class="slider"></div>			
+		</div>
 	</div>
 
 	<!-- visualization space -->
@@ -105,6 +126,7 @@
 
 	<!-- scatterplot points shader -->
 	<script id="shader-vs-points" type="x-shader/x-vertex">
+		precision mediump float;
 		attribute vec2 aVertexPosition;
 
 		uniform mat4 uMVMatrix;
@@ -114,6 +136,7 @@
 		uniform vec2 rangeLen;
 		uniform vec2 domainMin;
 		uniform vec2 domainLen;
+		uniform float pointSize;
 		    
 		void main(void) 
 		{
@@ -122,19 +145,20 @@
 			gl_Position = uPMatrix * uMVMatrix * vec4(p * rangeLen + rangeMin, 0.0, 1.0);
 			
 			// the size of the point
-			gl_PointSize = 10.0;
+			gl_PointSize = pointSize;
 		}
 
 	</script>
 
 	<script id="shader-fs-points" type="x-shader/x-fragment">
 		precision mediump float;
+		uniform float pointOpacity;
 		
 		void main() 
 		{
 			float dist = distance( gl_PointCoord, vec2(0.5) );
 			float alpha = 1.0 - smoothstep(0.45,0.5,dist);
-			gl_FragColor = vec4(0,0,0,alpha * 0.20);
+			gl_FragColor = vec4(0, 0, 0, alpha * pointOpacity);
 		}
 	</script>
 
@@ -259,6 +283,40 @@
 						shiftKey = false;
 					}
 				});
+
+			$('#sliderPointOpacity').slider({
+				range: false,
+				min: 0.0, max: 1.0,
+				value: POINT_OPACITY,
+				step: 0.05,
+				slide: function( event, ui ) {
+					POINT_OPACITY = ui.value;
+					tempo.renderGL();
+				}
+			});
+
+			$('#sliderPointSize').slider({
+				range: false,
+				min: 1, max: 30,
+				value: POINT_SIZE,
+				step: 1,
+				slide: function( event, ui ) {
+					POINT_SIZE = ui.value;
+					tempo.renderGL();
+				}
+			});
+
+			$('#sliderLineWidth').slider({
+				range: false,
+				min: 1.0, max: 7.0,
+				value: LINE_WIDTH,
+				step: 0.05,
+				slide: function( event, ui ) {
+					LINE_WIDTH = ui.value;
+					tempo.renderGL();
+				}
+			});
+
 		}
 
 		// fire up things

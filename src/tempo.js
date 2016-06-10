@@ -31,6 +31,13 @@ var SHOW_SCATTER_POINTS = true;
 var SHOW_SCATTER_LINES = false;
 var SHOW_TIME_AXIS = true;
 
+// size/opacity of gl points
+var POINT_OPACITY = 0.2;
+var POINT_SIZE = 10.0;
+
+// width of lines
+var LINE_WIDTH = 2.0;
+
 function Tempo()
 {
 	this.vis = d3.select("#visSVG");
@@ -408,7 +415,7 @@ Tempo.prototype.renderGL = function()
 	gl.viewport(0, 0, canvasSize.w, canvasSize.h);
 
 	// line size
-	gl.lineWidth(2.0);
+	gl.lineWidth(LINE_WIDTH);
 
 	// initialize shader
 	if (!this.linesShader) 
@@ -427,7 +434,9 @@ Tempo.prototype.renderGL = function()
 			getShader(gl, 'shader-vs-points'),
 			getShader(gl, 'shader-fs-points'), 
 			['aVertexPosition'],
-			['uPMatrix', 'uMVMatrix', 'rangeMin', 'rangeLen', 'domainMin', 'domainLen']
+			[	'pointOpacity', 'pointSize',
+				'uPMatrix', 'uMVMatrix', 'rangeMin', 'rangeLen', 'domainMin', 'domainLen'
+			]
 		);
 	}
 
@@ -511,6 +520,8 @@ Tempo.prototype.renderGL = function()
 						gl.uniform2fv(ps.uniform('rangeLen'), new Float32Array(rangeLen));
 						gl.uniform2fv(ps.uniform('domainMin'), new Float32Array(domainMin));
 						gl.uniform2fv(ps.uniform('domainLen'), new Float32Array(domainLen));
+						gl.uniform1f(ps.uniform('pointSize'), POINT_SIZE);
+						gl.uniform1f(ps.uniform('pointOpacity'), POINT_OPACITY);
 						
 						ps.attrib2buffer('aVertexPosition', glData.vertexBuffer, 2);
 						gl.drawArrays(gl.POINTS, i0, drawLen);
