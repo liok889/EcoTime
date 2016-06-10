@@ -10,10 +10,15 @@ var DEF_SCATTER_H = 120;
 var RESIZE_RECT = 10;
 
 // padding inside the scatterplot view
-var SCATTER_PAD = 7;
+var SCATTER_PAD = 10;
 
 // size of the text
 var VAR_TEXT_SIZE = 9;
+
+
+// dimensions of variable selection popup list
+var VAR_SELECTION_POPUP_W = 200;
+var VAR_SELECTION_POPUP_H = 350;
 
 function ScatterView(parentColumn, group, xVar, yVar, width, height)
 {
@@ -37,19 +42,61 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height)
 		.attr("class", "scatterBorderRect");
 
 	// create variable name
-	this.yVarText = this.group.append("text")
-		.html(yVar)
-		.style("font-size", (1+VAR_TEXT_SIZE) + "px")
-		.attr("class", "variableName")
-		.attr("text-anchor", "middle")
-		.attr("transform", "translate(" + VAR_TEXT_SIZE + "," + this.h/2 + "),rotate(-90)");
+	(function(scatterview, group)
+	{
+		scatterview.yVarText = group.append("text")
+			.html(scatterview.yVar)
+			.style("font-size", (1+VAR_TEXT_SIZE) + "px")
+			.attr("class", "variableName")
+			.attr("text-anchor", "middle")
+			.attr("transform", "translate(" + VAR_TEXT_SIZE + "," + scatterview.h/2 + "),rotate(-90)")
+			.on("click", function() {
 
-	this.xVarText = this.group.append("text")
-		.html(xVar)
-		.style("font-size", (1+VAR_TEXT_SIZE) + "px")
-		.attr("class", "variableName")
-		.attr("text-anchor", "middle")
-		.attr("x", this.w/2).attr("y", VAR_TEXT_SIZE);
+			 	// open up a selection menu with list of variable to choose from
+			 	var mouse = d3.mouse(document.body);
+				var selectionDiv = new ListSelection(
+					mouse[0], mouse[1], 
+					VAR_SELECTION_POPUP_W, VAR_SELECTION_POPUP_H, theData.getFields()
+				);
+				selectionDiv.setCallbacks(function(varName) 
+				{
+					scatterview.setYVar(varName);
+				});
+			})
+			.on("mouseover", function() {
+				d3.select(this).attr('class', 'variableNameHover');
+			})
+			.on("mouseout", function() {
+				d3.select(this).attr('class', 'variableName');
+			});
+
+		scatterview.xVarText = group.append("text")
+			.html(scatterview.xVar)
+			.style("font-size", (1+VAR_TEXT_SIZE) + "px")
+			.attr("class", "variableName")
+			.attr("text-anchor", "middle")
+			.attr("x", scatterview.w/2).attr("y", VAR_TEXT_SIZE)
+			.on("click", function() 
+			{
+			 	// open up a selection menu with list of variable to choose from
+			 	var mouse = d3.mouse(document.body);
+				var selectionDiv = new ListSelection(
+					mouse[0], mouse[1], 
+					VAR_SELECTION_POPUP_W, VAR_SELECTION_POPUP_H, theData.getFields()
+				);
+				selectionDiv.setCallbacks(function(varName) 
+				{
+					scatterview.setXVar(varName);
+				});
+			})
+			.on("mouseover", function() {
+				d3.select(this).attr('class', 'variableNameHover');
+			})
+			.on("mouseout", function() {
+				d3.select(this).attr('class', 'variableName');
+			});
+
+	})(this, this.group);
 
 	// append a resize rectangle at the lower-left corner
 	
@@ -60,7 +107,7 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height)
 			.attr("y", scatterview.h-RESIZE_RECT)
 			.attr("width", RESIZE_RECT).attr("height", RESIZE_RECT)
 			.style("fill", "white").style("fill-opacity", 0.0)
-			.on("mouseover", function() {
+			.on("mousemove", function() {
 				d3.select(this).style("fill", '#ff9999').style("fill-opacity", 1.0);
 			})
 			.on("mouseout", function() {
@@ -122,6 +169,22 @@ ScatterView.prototype.updateSize = function(w, h)
 }
 
 
+ScatterView.prototype.setXVar = function(xVar)
+{
+	this.xVar = xVar;
+	this.xVarText.html(xVar);
+	this.xSeries = theData.generateOneSeries(xVar);
+	tempo.renderGL();
+}
+ScatterView.prototype.setYVar = function(yVar)
+{
+	this.yVar = yVar;
+	this.yVarText.html(yVar);
+	this.ySeries = theData.generateOneSeries(yVar);
+	tempo.renderGL();
+}
+
+
 ScatterView.prototype.getXVar = function()
 {
 	return this.xVar;
@@ -150,20 +213,12 @@ ScatterView.prototype.getYDomain = function()
 	return this.ySeries.getExtents();
 }
 
-ScatterView.prototype.updateGraphics = function()
-{
-	this.xScale = d3.scale.linear()
-		.domain(this.xSeries.getExtents())
-		.range([SCATTER_PAD, this.w - SCATTER_PAD*2]);
-	
-	this.yScale = d3.scale.linear()
-		.domain(this.ySeries.getExtents())
-		.range([SCATTER_PAD, this.h - SCATTER_PAD*2]);
-
-	// update the graphics
-}
-
+// GL render
+// ==============
+// cache to store vertex buffers of the differnet time series combination
 var glCache = d3.map();
+
+// rendering function
 function getGLData(glContext, xVar, yVar)
 {
 	var cacheName = xVar + "_**_" + yVar;

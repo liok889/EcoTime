@@ -23,6 +23,37 @@ rect.scatterBorderRect {
 .variableName 
 {
 	font-family: 'Anonymous Pro', sans-serif;
+	fill: #aaaaaa;
+	cursor: pointer;
+}
+
+.variableNameHover 
+{
+	font-family: 'Anonymous Pro', sans-serif;
 	fill: red;
 	cursor: pointer;
+}
+
+
+/* drop down variable selection text */
+.listSelection {
+	font-family: 'Anonymous Pro', 'Helvetica';
+	font-size: 11px;
+}
+
+.listSelectionDiv {
+	position: absolute;
+	z-index: 100;
+	overflow-y: scroll;
+	background-color: white;
+	border: solid 1px #cccccc;
+	line-height: 90%;
+	padding: 10px 10px;
+	-webkit-touch-callout: none;
+	-webkit-user-select: none;
+	-khtml-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+	cursor: default;
 }
