@@ -59,7 +59,7 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height)
 				);
 				selectionDiv.setCallbacks(function(varName) 
 				{
-					if (shiftKey) {
+					if (!shiftKey) {
 						tempo.setYVar(scatterview.matrixIndex[1], varName);
 					}
 					else
@@ -91,7 +91,7 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height)
 				);
 				selectionDiv.setCallbacks(function(varName) 
 				{
-					if (shiftKey) {
+					if (!shiftKey) {
 						tempo.setXVar(scatterview.matrixIndex[0], varName);
 					}
 					else {
