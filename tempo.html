@@ -91,7 +91,7 @@
 	</div>
 
 	<!-- upper div -->
-	<div width="100%" style="padding: 5px 5px; border: 1px solid red">
+	<div width="100%" style="padding: 5px 5px">
 		<input id="checkShowPoints" type="checkbox" onclick="scatterVisibility()">Show points &nbsp;
 		<input id="checkShowLines" type="checkbox" onclick="scatterVisibility()">Show lines
 	</div>
@@ -116,11 +116,12 @@
 		    
 		void main(void) 
 		{
-			vec2 p = ((aVertexPosition - domainMin) / domainLen) * rangeLen + rangeMin;
-			gl_Position = uPMatrix * uMVMatrix * vec4(p, 0.0, 1.0);
+			vec2 p = ((aVertexPosition - domainMin) / domainLen);
+			p.y = 1.0 - p.y;
+			gl_Position = uPMatrix * uMVMatrix * vec4(p * rangeLen + rangeMin, 0.0, 1.0);
 			
 			// the size of the point
-			gl_PointSize = 15.0;
+			gl_PointSize = 10.0;
 		}
 
 	</script>
@@ -132,7 +133,7 @@
 		{
 			float dist = distance( gl_PointCoord, vec2(0.5) );
 			float alpha = 1.0 - smoothstep(0.45,0.5,dist);
-			gl_FragColor = vec4(0,0,0,alpha * 0.10);
+			gl_FragColor = vec4(0,0,0,alpha * 0.20);
 		}
 	</script>
 
@@ -147,14 +148,22 @@
 		uniform vec2 rangeLen;
 		uniform vec2 domainMin;
 		uniform vec2 domainLen;
+		uniform bool singleColor;
+
 		// color
 		varying lowp vec4 vColor;
 				    
 		void main(void) {
-			vec2 p = ((aVertexPosition - domainMin) / domainLen) * rangeLen + rangeMin;
-			gl_Position = uPMatrix * uMVMatrix * vec4(p, 0.0, 1.0);
-			vColor = vec4(vec3(aVertexColor), aVertexColor.a * 0.8);
-			gl_PointSize = 5.0;
+			vec2 p = ((aVertexPosition - domainMin) / domainLen);
+			p.y = 1.0 - p.y;
+			gl_Position = uPMatrix * uMVMatrix * vec4(p * rangeLen + rangeMin, 0.0, 1.0);
+			if (singleColor) {
+				vColor = vec4(1.0, 0.678, 0.2, 0.85);
+			}
+			else
+			{
+				vColor = vec4(vec3(aVertexColor), aVertexColor.a * 0.75);
+			}
 		}
 	</script>
 
@@ -183,6 +192,7 @@
 		{
 			SHOW_SCATTER_POINTS = d3.select("#checkShowPoints").node().checked;
 			SHOW_SCATTER_LINES = d3.select("#checkShowLines").node().checked;
+			tempo.renderGL();
 		}
 
 		function resizeWindow()

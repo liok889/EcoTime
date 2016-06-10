@@ -329,7 +329,6 @@ Tempo.prototype.renderGL = function()
 	// set blending, clear color, and disable depth test
 	gl.clearColor(0.0, 0.0, 0.0, 0.0);
 	gl.disable(gl.DEPTH_TEST);
-	gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
 
 	// viewport
 	gl.viewport(0, 0, canvasSize.w, canvasSize.h);
@@ -344,7 +343,7 @@ Tempo.prototype.renderGL = function()
 			getShader(gl, 'shader-vs-lines'),
 			getShader(gl, 'shader-fs-lines'), 
 			['aVertexPosition', 'aVertexColor'],
-			['uPMatrix', 'uMVMatrix', 'rangeMin', 'rangeLen', 'domainMin', 'domainLen']
+			['singleColor', 'uPMatrix', 'uMVMatrix', 'rangeMin', 'rangeLen', 'domainMin', 'domainLen']
 		);
 	}
 
@@ -430,7 +429,9 @@ Tempo.prototype.renderGL = function()
 					// update the uniform
 					if (SHOW_SCATTER_POINTS)
 					{
+						gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
 						gl.enable(gl.BLEND);
+
 						ps.useShader();
 						gl.uniform2fv(ps.uniform('rangeMin'), new Float32Array(rangeMin));
 						gl.uniform2fv(ps.uniform('rangeLen'), new Float32Array(rangeLen));
@@ -446,18 +447,29 @@ Tempo.prototype.renderGL = function()
 				
 					if (SHOW_SCATTER_LINES)
 					{
+						gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+						gl.enable(gl.BLEND);
+
+
 						// update the uniform
 						ls.useShader();
+						ls.attrib2buffer('aVertexPosition', glData.vertexBuffer, 2);
+						ls.attrib2buffer('aVertexColor', glData.colorBuffer, 4);
+
 						gl.uniform2fv(ls.uniform('rangeMin'), new Float32Array(rangeMin));
 						gl.uniform2fv(ls.uniform('rangeLen'), new Float32Array(rangeLen));
 						gl.uniform2fv(ls.uniform('domainMin'), new Float32Array(domainMin));
 						gl.uniform2fv(ls.uniform('domainLen'), new Float32Array(domainLen));
+						
+						gl.uniform1i(ls.uniform('singleColor'), 1);
+						gl.drawArrays(gl.LINE_STRIP, i0, drawLen);
 
-						ls.attrib2buffer('aVertexPosition', glData.vertexBuffer, 2);
-						ls.attrib2buffer('aVertexColor', glData.colorBuffer, 4);
+						gl.uniform1i(ls.uniform('singleColor'), 0);
 						gl.drawArrays(gl.LINE_STRIP, i0, drawLen);
 
 						ls.unuseShader();
+						gl.disable(gl.BLEND);
+
 					}
 				}
 			}
