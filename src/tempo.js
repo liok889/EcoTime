@@ -300,6 +300,46 @@ Tempo.prototype.addColumn = function()
 	this.renderGL();
 }
 
+Tempo.prototype.toggleLinechartView = function(viewIndex)
+{
+	for (var i=0; i<this.columns.length; i++) {
+		this.columns[i].column.toggleLinechartView(
+			viewIndex,
+
+			// pass glStartAnimation, glEndAnimation for first column only
+			i == 0 ? glStartAnimation : undefined,
+			i == 0 ? glEndAnimation: undefined
+		);
+	}
+}
+
+var glAnimation = null;
+function glStartAnimation()
+{
+	if (glAnimation === null) 
+	{
+		glAnimation = requestAnimationFrame(function() 
+		{
+			glAnimation = null;
+			tempo.renderGL();
+
+			// schedule another animation
+			glStartAnimation();
+		});
+	}
+}
+
+function glEndAnimation()
+{
+	if (glAnimation !== null) {
+		cancelAnimationFrame(glAnimation);
+		glAnimation = null;
+
+		// one more render
+		tempo.renderGL();
+	}
+}
+
 Tempo.prototype.removeColumn = function()
 {
 	if (this.columns.length > 0) 
@@ -491,7 +531,7 @@ Tempo.prototype.renderGL = function()
 		{
 			var view = views[j];
 
-			rangeLen[1] = view.getH() - SCATTER_PAD*2
+			rangeLen[1] = view.getScatterH() - SCATTER_PAD*2
 
 			var xDomain = view.getXDomain();
 			var yDomain = view.getYDomain();
@@ -566,7 +606,7 @@ Tempo.prototype.renderGL = function()
 			}
 
 			// offset Y to the next scatter plot
-			rangeMin[1] += view.getH() + SCATTER_SPACING;
+			rangeMin[1] += view.getCurrentH() + SCATTER_SPACING;
 		}
 
 		// run the offset

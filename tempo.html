@@ -6,8 +6,10 @@
 	<!-- css -->
 	<link href='css/tempo.css' rel='stylesheet' type='text/css'>
 
+	
 	<link href='https://fonts.googleapis.com/css?family=Lato:400,300,700' rel='stylesheet' type='text/css'>
 	<link href='https://fonts.googleapis.com/css?family=Anonymous+Pro:400,700' rel='stylesheet' type='text/css'>
+	
 	<link href="lib/jquery-ui.css" rel="stylesheet" type="text/css">
 
 	<script src="lib/d3.min.js" charset="utf-8"></script>
@@ -231,7 +233,7 @@
 			// maximize div.visSpace
 			var visSpace = d3.select('div.visSpace');
 			var visSpaceBounds = visSpace.node().getBoundingClientRect();
-			//visSpace.style("height", (window.innerHeight-visSpaceBounds.top-10) + 'px');
+			visSpace.style("height", (window.innerHeight-visSpaceBounds.top-10) + 'px');
 
 			var visSVG = document.getElementById('visSVG');
 			var bounding = visSVG.getBoundingClientRect();

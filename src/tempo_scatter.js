@@ -21,7 +21,13 @@ var VAR_TEXT_SIZE = 9;
 var VAR_SELECTION_POPUP_W = 200;
 var VAR_SELECTION_POPUP_H = 350;
 
-function ScatterView(parentColumn, group, xVar, yVar, width, height)
+// default linechart
+var DEF_LINECHART_VISIBILITY = false;
+var DEF_LINECHART_H = 80;
+var EXPAND_DURATION = 150;
+
+
+function ScatterView(parentColumn, group, xVar, yVar, width, height, linechartH, linechartVisibility)
 {
 	this.column = parentColumn
 	this.group = group;
@@ -35,13 +41,13 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height)
 	this.w = width  || DEF_SCATTER_W;
 	this.h = height || DEF_SCATTER_H;
 
-	// create rectangle
+	// create background rectangle
 	this.bgRect = this.group.append("rect")
 		.attr("width", this.w)
 		.attr("height", this.h)
 		.attr("class", "scatterBorderRect");
 
-	// create variable name
+	// create text to show variable names
 	(function(scatterview, group)
 	{
 		scatterview.yVarText = group.append("text")
@@ -109,6 +115,23 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height)
 
 	})(this, this.group);
 
+	// create a group to show a linechart view of the time series
+	this.linechartVisibility = linechartVisibility !== undefined ? linechartVisibility : DEF_LINECHART_VISIBILITY;
+	this.linechartGroup = this.group.append("g")
+		.style("visibility", this.linechartVisibility ? "visible" : "hidden")
+		.attr("transform", "translate(0," + this.h + ")");
+
+	this.linechartW = DEF_SCATTER_W;
+	this.linechartH = linechartH || DEF_LINECHART_H;
+
+	this.linechartContent = this.linechartGroup.append("g")
+		.style("visibility", this.linechartVisibility ? "visible" : "hidden")
+
+	this.linechartRect = this.linechartGroup.append("rect")
+		.attr("class", "scatterBorderRect")
+		.attr("width", this.linechartW)
+		.attr("height", this.linechartVisibility ? DEF_LINECHART_H : 0);
+
 	// append a resize rectangle at the lower-left corner
 	this.resizeButton = new InlineButton(
 		this.group,
@@ -118,35 +141,106 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height)
 		'assets/resize.png'
 	);
 
-	(function(button, scatterview) 
+	this.expandButton = new InlineButton(
+		this.group,
+		1, this.h - BUTTON_SIZE-1,
+		BUTTON_SIZE, BUTTON_SIZE,
+		'assets/expand.png'
+	);
+
+	(function(resizeButton, expandButton, scatterview) 
 	{
-		button.on("mousedown", function() 
+		resizeButton.on("mousedown", function() 
 		{
 			//d3.select("body").style("cursor", "nwse-resize");
-			button.dragOn();
+			resizeButton.dragOn();
 			scatterview.lastMouse = d3.mouse(this);
 			d3.select(window).on("mousemove.resizeScatterview", function() 
 			{
-				var mouse = d3.mouse(scatterview.resizeButton.node());
+				var mouse = d3.mouse(resizeButton.node());
 				var dMouse = [mouse[0]-scatterview.lastMouse[0], mouse[1]-scatterview.lastMouse[1]];
 				scatterview.lastMouse = mouse;
 
 				// calculate new size
 				var newW = Math.max(scatterview.w + dMouse[0],30);
 				var newH = Math.max(scatterview.h + dMouse[1],30);
-				scatterview.column.updateScatterSize(scatterview, newW, newH);
+				scatterview.column.updateScatterSize(scatterview, newW, {
+					scatter: newH,
+					linechart: scatterview.linechartH
+				});
 			});
 
 			d3.select(window).on("mouseup.resizeScatterview", function() 
 			{
-				button.dragOff();
+				resizeButton.dragOff();
 				//d3.select('body').style('cursor', '');
 				d3.select(window)
 					.on("mousemove.resizeScatterview", null)
 					.on("mouseup.resizeScatterview", null);
-			})			
+			})		
 		});
-	})(this.resizeButton, this);
+
+		expandButton.on("click", function() 
+		{
+			scatterview.column.initiateToggleLinechartView(scatterview);
+		});
+
+	})(this.resizeButton, this.expandButton, this);
+}
+
+ScatterView.prototype.getLinechartVisibility = function()
+{
+	return this.linechartVisibility;
+}
+
+ScatterView.prototype.toggleLinechartView = function(startCallback, endCallback)
+{
+	return (function(scatterview, start, end)
+	{
+		if (!scatterview.linechartVisibility)
+		{
+			// show
+			scatterview.linechartVisibility = true;
+			scatterview.linechartGroup.style("visibility", "visible");
+			scatterview.linechartRect.transition().duration(EXPAND_DURATION)
+				.attr("height", scatterview.linechartH)
+				.each("start", function() {
+					if (start) {
+						start();
+					}
+				})
+				.each("end", function() {
+					scatterview.linechartContent
+						.style("visibility", "visible");
+					if (end) {
+						end();
+					}
+				});
+		}
+		else
+		{
+			// hide
+			scatterview.linechartVisibility = false;
+			scatterview.linechartContent.style("visibility", "hidden");
+			scatterview.linechartRect.transition().duration(EXPAND_DURATION)
+				.attr("height", 0)
+				.each("start", function() {
+					if (start) {
+						start();
+					}
+				})
+				.each("end", function() {
+					scatterview.linechartGroup
+						.style("visibility", "hidden");
+					if (end) {
+						end();
+					}
+				});
+		}
+
+		// toggle
+		return scatterview.linechartVisibility;
+	})(this, startCallback, endCallback);
 }
 
 ScatterView.prototype.setMatrixIndex = function(index)
@@ -166,7 +260,9 @@ ScatterView.prototype.getGroup = function()
 ScatterView.prototype.updateSize = function(w, h)
 {
 	this.w = w || this.w;
-	this.h = h || this.h;
+	this.h = h ? h.scatter : this.h;
+	this.linechartH = h ? h.linechart : this.linechartH;
+
 	this.bgRect
 		.attr("width", this.w)
 		.attr("height", this.h)
@@ -178,6 +274,14 @@ ScatterView.prototype.updateSize = function(w, h)
 	this.resizeButton
 		.attr("x", this.w-BUTTON_SIZE-1)
 		.attr("y", this.h-BUTTON_SIZE-1);
+	this.expandButton
+		.attr("x", "1").attr("y", this.h - BUTTON_SIZE-1);
+
+	// linechart group
+	this.linechartGroup
+		.attr("transform", "translate(0," + this.h + ")");
+	this.linechartRect
+		.attr("width", this.w);
 }
 
 
@@ -211,9 +315,27 @@ ScatterView.prototype.getW = function()
 	return this.w;
 }
 
+// returns the instantaneous height
+ScatterView.prototype.getCurrentH = function()
+{
+	var attrH = this.linechartRect.attr("height")
+	var linechartH = isNaN(attrH) ? 0 : +attrH;
+	return this.h + linechartH;
+}
+
 ScatterView.prototype.getH = function()
 {
+	var height = this.h + (this.linechartVisibility ? this.linechartH : 0);
+	return height;
+}
+
+ScatterView.prototype.getScatterH = function()
+{
 	return this.h;
+}
+ScatterView.prototype.getLinechartH = function()
+{
+	return this.linechartH;
 }
 
 ScatterView.prototype.getXDomain = function()
