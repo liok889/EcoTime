@@ -531,6 +531,9 @@ Tempo.prototype.renderGL = function()
 		{
 			var view = views[j];
 
+			// set time range for this view
+			view.setTimeRange( timeRange );
+
 			rangeLen[1] = view.getScatterH() - SCATTER_PAD*2
 
 			var xDomain = view.getXDomain();
@@ -543,7 +546,7 @@ Tempo.prototype.renderGL = function()
 			];
 
 			// render
-			var glData = getGLData(gl, view.getXVar(), view.getYVar());
+			var glData = getPairedTimeseries(view.getXVar(), view.getYVar());
 
 			// determine draw range
 			var i0 = glData.indices[ timeRange[0] ];
@@ -619,30 +622,3 @@ function timeRangeFromNormalized(nRange)
 	var N = theData.getTimeLength();		
 	return [ Math.floor(nRange[0] * (N-1)+0.5), Math.min(N-1,Math.floor(nRange[1] * (N-1)+0.5)) ];
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

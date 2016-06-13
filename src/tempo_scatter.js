@@ -188,6 +188,28 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height, linechartH,
 	})(this.resizeButton, this.expandButton, this);
 }
 
+ScatterView.prototype.setTimeRange = function(timeRange)
+{
+	var updated = false;
+	if (!this.timeRange) {
+		this.timeRange = [timeRange[0], timeRange[1]];
+		updated = true;
+	}
+	else
+	{
+		if (this.timeRange[0] != timeRange[0] || this.timeRange[1] != timeRange[1]) {
+			this.timeRange = [timeRange[0], timeRange[1]];
+			updated = true;
+		}
+	}
+
+	if (!this.linechartTimeRange || this.linechartTimeRange[0] != timeRange[0] || this.linechartTimeRange[1] != timeRange[1])
+	{
+		// update line chart
+		this.updateLinechart();
+	}
+}
+
 ScatterView.prototype.getLinechartVisibility = function()
 {
 	return this.linechartVisibility;
@@ -347,13 +369,28 @@ ScatterView.prototype.getYDomain = function()
 	return this.ySeries.getExtents();
 }
 
+ScatterView.prototype.updateLinechart = function()
+{
+	var pairedSeries = getPairedTimeseries(this.xVar, this.yVar);
+	var xSeries = pairedSeries.xSeries.getSeries();
+	var ySeries = pairedSeries.ySeries.getSeries();
+
+	var chunksX = [];
+	var chunksY = [];
+
+	for (var i=this.timeRange[0], len = Math.min(xSeries.length-1, this.timeRange[1]); i <= len; i++) {
+
+
+	}
+}
+
 // GL render
 // ==============
 // cache to store vertex buffers of the differnet time series combination
 var glCache = d3.map();
 
 // rendering function
-function getGLData(glContext, xVar, yVar)
+function getPairedTimeseries(xVar, yVar)
 {
 	var cacheName = xVar + "_**_" + yVar;
 	var glData = glCache.get(cacheName);
@@ -372,7 +409,6 @@ function getGLData(glContext, xVar, yVar)
 		var colorScale = d3.scale.quantize().domain([0, 1]).range(d3.range(COLOR_SCALE.length));
 
 		// create vertex array if we have an OpenGL context
-		var gl = glContext;
 		if (gl) 
 		{	
 			// create arrays for vertices and colors
@@ -389,6 +425,9 @@ function getGLData(glContext, xVar, yVar)
 			var vertexCount = 0;
 			var lastIndex = -1;
 
+			var ts1 = new Timeseries(N); var s1 = ts1.getSeries();
+			var ts2 = new Timeseries(N); var s2 = ts2.getSeries();
+
 			for (var i=0; i<N; i++) 
 			{
 				var v1 = xSeries[i]; var b1 = v1 !== null && v1 !== undefined;
@@ -397,7 +436,10 @@ function getGLData(glContext, xVar, yVar)
 				if (b1 && b2)  
 				{
 					vertices.push( v1 );
-					vertices.push( v2 );		
+					vertices.push( v2 );
+
+					s1.push(v1);
+					s2.push(v2);		
 				
 					// determine color based on the time of the day
 					var timestep = new Date(beginTime + i*timestepOffset);
@@ -419,6 +461,8 @@ function getGLData(glContext, xVar, yVar)
 				else
 				{
 					indices.push(lastIndex);
+					s1.push(null);
+					s2.push(null);
 				}
 			}
 
@@ -431,11 +475,20 @@ function getGLData(glContext, xVar, yVar)
 			gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
 			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
 
+			// normalize the timeseries
+			ts1.normalize();
+			ts2.normalize();
+
 			glData = {
 				vertexBuffer: vertexBuffer,
 				colorBuffer: colorBuffer,
 				indices: indices,
-				vertexCount: vertexCount
+				vertexCount: vertexCount,
+				xSeries: ts1,
+				ySeries: ts2,
+
+				xChunks: chunketize(ts1.getSeries(), theData.getTimeLength()),
+				yChunks: chunketize(ts2.getSeries(), theData.getTimeLength())
 			};
 
 			// store in cache
@@ -445,6 +498,53 @@ function getGLData(glContext, xVar, yVar)
 	return glData;
 }
 
+function chunketize(series, N)
+{
+	var chunk = null, chunks = null;
+	var points = [];
+	var indices = [];
 
+	for (var i=0, len = series.length; i<len; i++) 
+	{
+		var v = series[i];
+		if (v !== null && v !== undefined) 
+		{
+			if (!chunk) {
+				chunk = [{x: i/N, y: 1.0 - v}];
+			}
+		}
+		else
+		{
+			if (chunk)
+			{
+				if (chunk.length == 1) 
+				{
+					points.push(chunk[0]);
+				}
+				else
+				{
+					chunks.push(chunk);
+				}
+				chunk = null;
+			}
+		}
+	}
+
+	if (chunk) {
+		if (chunk.length == 1) {
+			points.push(chunk[0]);
+		}
+		else
+		{
+			chunks.push(chunk);
+		}
+		chunk = null;	
+	}
+
+	return {
+		chunks: chunks,
+		points: points
+	};
+}
 
 
