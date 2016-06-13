@@ -7,14 +7,15 @@
 // default dimensions of the scatterplot view
 var DEF_SCATTER_W = 120;
 var DEF_SCATTER_H = 120;
-var RESIZE_RECT = 10;
+
+// size of inline buttons
+var BUTTON_SIZE = 10;
 
 // padding inside the scatterplot view
 var SCATTER_PAD = 10;
 
 // size of the text
 var VAR_TEXT_SIZE = 9;
-
 
 // dimensions of variable selection popup list
 var VAR_SELECTION_POPUP_W = 200;
@@ -109,51 +110,43 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height)
 	})(this, this.group);
 
 	// append a resize rectangle at the lower-left corner
-	
-	this.resizeRect = (function(group, scatterview) 
+	this.resizeButton = new InlineButton(
+		this.group,
+		this.w - BUTTON_SIZE-1,
+		this.h - BUTTON_SIZE-1,
+		BUTTON_SIZE, BUTTON_SIZE,
+		'assets/resize.png'
+	);
+
+	(function(button, scatterview) 
 	{
-		return group.append("rect")
-			.attr("x", scatterview.w-RESIZE_RECT)
-			.attr("y", scatterview.h-RESIZE_RECT)
-			.attr("width", RESIZE_RECT).attr("height", RESIZE_RECT)
-			.style("fill", "white").style("fill-opacity", 0.0)
-			.on("mousemove", function() {
-				d3.select(this).style("fill", '#ff9999').style("fill-opacity", 1.0);
-			})
-			.on("mouseout", function() {
-				if (!scatterview.resizing) {
-					d3.select(this).style("fill", "white").style("fill-opacity", 0.0);
-				}
-			})
-			.on("mousedown", function() {
-				d3.select('body').style('cursor', 'nwse-resize');
-				scatterview.resizing = true;
-				scatterview.lastMouse = d3.mouse(this);
-				d3.select(window).on("mousemove.resizeScatterview", function() 
-				{
-					var mouse = d3.mouse(scatterview.resizeRect.node());
-					var dMouse = [mouse[0]-scatterview.lastMouse[0], mouse[1]-scatterview.lastMouse[1]];
-					scatterview.lastMouse = mouse;
+		button.on("mousedown", function() 
+		{
+			//d3.select("body").style("cursor", "nwse-resize");
+			button.dragOn();
+			scatterview.lastMouse = d3.mouse(this);
+			d3.select(window).on("mousemove.resizeScatterview", function() 
+			{
+				var mouse = d3.mouse(scatterview.resizeButton.node());
+				var dMouse = [mouse[0]-scatterview.lastMouse[0], mouse[1]-scatterview.lastMouse[1]];
+				scatterview.lastMouse = mouse;
 
-					// calculate new size
-					var newW = Math.max(scatterview.w + dMouse[0],30);
-					var newH = Math.max(scatterview.h + dMouse[1],30);
-					scatterview.column.updateScatterSize(scatterview, newW, newH);
-				});
-
-				d3.select(window).on("mouseup.resizeScatterview", function() 
-				{
-					d3.select('body').style('cursor', '');
-					scatterview.resizeRect
-						.style("fill", "white").style("fill-opacity", 0.0);
-
-					scatterview.resizing = undefined;
-					d3.select(window)
-						.on("mousemove.resizeScatterview", null)
-						.on("mouseup.resizeScatterview", null);
-				})
+				// calculate new size
+				var newW = Math.max(scatterview.w + dMouse[0],30);
+				var newH = Math.max(scatterview.h + dMouse[1],30);
+				scatterview.column.updateScatterSize(scatterview, newW, newH);
 			});
-	})(this.group, this);
+
+			d3.select(window).on("mouseup.resizeScatterview", function() 
+			{
+				button.dragOff();
+				//d3.select('body').style('cursor', '');
+				d3.select(window)
+					.on("mousemove.resizeScatterview", null)
+					.on("mouseup.resizeScatterview", null);
+			})			
+		});
+	})(this.resizeButton, this);
 }
 
 ScatterView.prototype.setMatrixIndex = function(index)
@@ -182,9 +175,9 @@ ScatterView.prototype.updateSize = function(w, h)
 		.attr("transform", "translate(" + VAR_TEXT_SIZE + "," + this.h/2 + "),rotate(-90)");
 	this.xVarText
 		.attr("x", this.w/2).attr("y", VAR_TEXT_SIZE);
-	this.resizeRect
-		.attr("x", this.w-RESIZE_RECT)
-		.attr("y", this.h-RESIZE_RECT);
+	this.resizeButton
+		.attr("x", this.w-BUTTON_SIZE-1)
+		.attr("y", this.h-BUTTON_SIZE-1);
 }
 
 

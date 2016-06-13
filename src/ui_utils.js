@@ -4,6 +4,8 @@
  * =============================================
  */
 
+// Button
+// =======
 function Button(svg, x, y, w, h, img, hoverImg, callback)
 {
 	this.button = svg.append("image")
@@ -54,12 +56,86 @@ Button.prototype.setCallback = function(callback) {
 	this.callback = callback;
 }
 
+// Inline button
+// ==============
+function InlineButton(svg, x, y, w, h, img)
+{
+	this.dragging = false;
+	this.group = svg.append("g");
+	this.image = this.group.append("image")
+		.attr("xlink:href", img)
+		.attr("x", x).attr("y", y)
+		.attr("width", w).attr("height", h)
+		.style("visibility", "hidden");
+
+	this.button = (function(x, y, w, h, button) 
+	{
+		var selection = button.group.selectAll("rect.inlineButton").data([button]);
+		selection.enter().append("rect")
+			.attr("x", x).attr("y", y)
+			.attr("width", w).attr("height", h)
+			.attr("class", "inlineButton")
+			.style("fill", "white").style("stroke", "none")
+			.style("fill-opacity", "0.0")
+			.on("mousemove", function() {
+				button.image.style("visibility", "visible")
+			})
+			.on("mouseout", function() {
+				if (!button.dragging) {
+					button.image.style("visibility", "hidden");
+				}
+			});
+		return selection;
+	})(x, y, w, h, this);
+}
+
+InlineButton.prototype.dragOn = function()
+{
+	this.dragging = true;
+}
+
+InlineButton.prototype.dragOff = function()
+{
+	this.dragging = false;
+	this.image.style("visibility", "hidden");
+}
+
+InlineButton.prototype.on = function(event, callback)
+{
+	(function(button) 
+	{
+		button.on(event, function(d) 
+		{
+			var thisContext = this;
+			callback.call(thisContext, d);
+		});
+	})(this.button);
+	return this;
+}
+
+InlineButton.prototype.attr = function(attribute, value)
+{
+	this.image.attr(attribute, value);
+	this.button.attr(attribute, value);
+	return this;
+}
+
+InlineButton.prototype.node = function()
+{
+	return this.button.node();
+}
+
+// Misc UI functions
+// ==================
 function putNodeOnTop(node)
 {
 	var n = jQuery(node);
 	n.parent().append(n.detach());
 }
 
+
+// WebGL Shader
+// ============
 function Shader(gl, vertexSource, fragmentSource, attributes, uniforms)
 {
 	// shader source

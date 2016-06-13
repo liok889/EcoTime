@@ -392,6 +392,12 @@ Tempo.prototype.realignColumns = function(instigator, scatterHeights)
 	this.renderGL();
 	
 }
+
+Tempo.prototype.showTimelineDrawer = function()
+{
+
+}
+
 Tempo.prototype.renderGL = function()
 {
 	// initialize the shader
