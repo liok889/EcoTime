@@ -23,7 +23,7 @@ rect.scatterBorderRect {
 .variableName 
 {
 	font-family: 'Anonymous Pro', sans-serif;
-	fill: #aaaaaa;
+	fill: #cccccc;
 	cursor: pointer;
 }
 
@@ -66,14 +66,14 @@ rect.scatterBorderRect {
 	shape-rendering: crispEdges;
 }
 
-.xLinechart {
+.linechartData {
 	fill: none;
+	stroke-width: 0.5px;
+}
+.xLinechart {
 	stroke: #4d4d4d;
-	stroke-width: 1px;
 }
 
 .yLinechart {
-	fill: none;
 	stroke: #d6604d;
-	stroke-width: 1px;
 }
