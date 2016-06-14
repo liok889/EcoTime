@@ -160,6 +160,11 @@ InlineButton.prototype.node = function()
 	return this.button.node();
 }
 
+InlineButton.prototype.visible = function(vis)
+{
+	this.button.style("visibility", vis ? 'visible' : 'hidden');
+}
+
 // Misc UI functions
 // ==================
 function putNodeOnTop(node)

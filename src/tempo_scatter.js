@@ -35,7 +35,7 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height, linechartH,
 	this.xVar = xVar;
 	this.yVar = yVar;
 
-	this.defs = getSVG(this.group).select("defs");
+	this.defs = d3.select(getSVG(this.group.node())).select("defs");
 
 
 	// get the intersection between the two series
@@ -138,7 +138,7 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height, linechartH,
 	this.linechartRect = this.linechartGroup.append("rect")
 		.attr("class", "scatterBorderRect")
 		.attr("width", this.linechartW)
-		.attr("height", this.linechartVisibility ? DEF_LINECHART_H : 0);
+		.attr("height", this.linechartVisibility ? linechartH : 0);
 
 	// append a resize rectangle at the lower-left corner
 	this.resizeScatter = new InlineButton(
@@ -156,6 +156,7 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height, linechartH,
 		BUTTON_SIZE, BUTTON_SIZE,
 		'assets/resize.png'
 	);
+	this.resizeLinechart.visible(this.linechartVisibility);
 
 	this.expandButton = new InlineButton(
 		this.group,
@@ -181,7 +182,7 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height, linechartH,
 			// calculate new size
 			var newW = Math.max(scatterview.w + dMouse[0],30);
 			var newH = scatterview.h
-			var newLH = Math.max(scatterview.linechartH + dMouse[1],10);
+			var newLH = Math.max(scatterview.linechartH + dMouse[1],Math.max(10,2*LINECHART_PAD_H));
 			scatterview.column.updateScatterSize(scatterview, newW, 
 			{
 				scatter: newH,
@@ -238,6 +239,7 @@ ScatterView.prototype.toggleLinechartView = function(startCallback, endCallback)
 				.each("end", function() 
 				{
 					scatterview.updateLinechart();
+					scatterview.resizeLinechart.visible(true);
 
 					scatterview.linechartContent
 						.style("visibility", "visible");
@@ -259,6 +261,7 @@ ScatterView.prototype.toggleLinechartView = function(startCallback, endCallback)
 					}
 				})
 				.each("end", function() {
+					scatterview.resizeLinechart.visible(false);
 					scatterview.linechartGroup
 						.style("visibility", "hidden");
 					if (end) {
@@ -303,14 +306,20 @@ ScatterView.prototype.updateSize = function(w, h)
 	this.resizeScatter
 		.attr("x", this.w-BUTTON_SIZE-1)
 		.attr("y", this.h-BUTTON_SIZE-1);
+	this.resizeLinechart
+		.attr("x", this.w-BUTTON_SIZE-1)
+		.attr("y", this.h-BUTTON_SIZE-1+this.linechartH);
+
 	this.expandButton
 		.attr("x", "1").attr("y", this.h - BUTTON_SIZE-1);
 
 	// linechart group
 	this.linechartGroup
 		.attr("transform", "translate(0," + this.h + ")");
+	
 	this.linechartRect
-		.attr("width", this.w);
+		.attr("width", this.w)
+		.attr("height", this.linechartH);
 
 	// update line chart
 	this.updateLinechart();
