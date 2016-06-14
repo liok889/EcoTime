@@ -65,3 +65,15 @@ rect.scatterBorderRect {
 	stroke: #000;
 	shape-rendering: crispEdges;
 }
+
+.xLinechart {
+	fill: none;
+	stroke: #4d4d4d;
+	stroke-width: 1px;
+}
+
+.yLinechart {
+	fill: none;
+	stroke: #d6604d;
+	stroke-width: 1px;
+}

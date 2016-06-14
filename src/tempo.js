@@ -440,6 +440,7 @@ Tempo.prototype.showTimelineDrawer = function()
 
 Tempo.prototype.renderGL = function()
 {
+
 	// initialize the shader
 	// =====================
 	var canvasSize = this.getSVGSize();

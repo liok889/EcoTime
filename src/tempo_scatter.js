@@ -13,7 +13,8 @@ var BUTTON_SIZE = 10;
 
 // padding inside the scatterplot view
 var SCATTER_PAD = 10;
-
+var LINECHART_PAD_W = 4;
+var LINECHART_PAD_H = 2;
 // size of the text
 var VAR_TEXT_SIZE = 9;
 
@@ -23,7 +24,7 @@ var VAR_SELECTION_POPUP_H = 350;
 
 // default linechart
 var DEF_LINECHART_VISIBILITY = false;
-var DEF_LINECHART_H = 80;
+var DEF_LINECHART_H = 40;
 var EXPAND_DURATION = 150;
 
 
@@ -33,6 +34,9 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height, linechartH,
 	this.group = group;
 	this.xVar = xVar;
 	this.yVar = yVar;
+
+	this.defs = getSVG(this.group).select("defs");
+
 
 	// get the intersection between the two series
 	this.xSeries = theData.generateOneSeries(xVar);
@@ -126,6 +130,10 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height, linechartH,
 
 	this.linechartContent = this.linechartGroup.append("g")
 		.style("visibility", this.linechartVisibility ? "visible" : "hidden")
+	var linechartData = this.linechartContent.append("g").attr("class", "linechartData")
+	linechartData.append("g").attr("class", "xLinechart");
+	linechartData.append("g").attr("class", "yLinechart");
+
 
 	this.linechartRect = this.linechartGroup.append("rect")
 		.attr("class", "scatterBorderRect")
@@ -133,10 +141,18 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height, linechartH,
 		.attr("height", this.linechartVisibility ? DEF_LINECHART_H : 0);
 
 	// append a resize rectangle at the lower-left corner
-	this.resizeButton = new InlineButton(
+	this.resizeScatter = new InlineButton(
 		this.group,
 		this.w - BUTTON_SIZE-1,
 		this.h - BUTTON_SIZE-1,
+		BUTTON_SIZE, BUTTON_SIZE,
+		'assets/resize.png'
+	);
+
+	this.resizeLinechart = new InlineButton(
+		this.group,
+		this.w - BUTTON_SIZE-1,
+		this.h + this.linechartH - BUTTON_SIZE-1,
 		BUTTON_SIZE, BUTTON_SIZE,
 		'assets/resize.png'
 	);
@@ -148,44 +164,37 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height, linechartH,
 		'assets/expand.png'
 	);
 
-	(function(resizeButton, expandButton, scatterview) 
+	(function(scatterview) 
 	{
-		resizeButton.on("mousedown", function() 
-		{
-			//d3.select("body").style("cursor", "nwse-resize");
-			resizeButton.dragOn();
-			scatterview.lastMouse = d3.mouse(this);
-			d3.select(window).on("mousemove.resizeScatterview", function() 
-			{
-				var mouse = d3.mouse(resizeButton.node());
-				var dMouse = [mouse[0]-scatterview.lastMouse[0], mouse[1]-scatterview.lastMouse[1]];
-				scatterview.lastMouse = mouse;
-
-				// calculate new size
-				var newW = Math.max(scatterview.w + dMouse[0],30);
-				var newH = Math.max(scatterview.h + dMouse[1],30);
-				scatterview.column.updateScatterSize(scatterview, newW, {
-					scatter: newH,
-					linechart: scatterview.linechartH
-				});
+		scatterview.resizeScatter.on("resize", function(dMouse) 
+		{		
+			// calculate new size
+			var newW = Math.max(scatterview.w + dMouse[0],30);
+			var newH = Math.max(scatterview.h + dMouse[1],30);
+			scatterview.column.updateScatterSize(scatterview, newW, {
+				scatter: newH,
+				linechart: scatterview.linechartH
 			});
-
-			d3.select(window).on("mouseup.resizeScatterview", function() 
-			{
-				resizeButton.dragOff();
-				//d3.select('body').style('cursor', '');
-				d3.select(window)
-					.on("mousemove.resizeScatterview", null)
-					.on("mouseup.resizeScatterview", null);
-			})		
 		});
 
-		expandButton.on("click", function() 
+		scatterview.resizeLinechart.on("resize", function(dMouse) {
+			// calculate new size
+			var newW = Math.max(scatterview.w + dMouse[0],30);
+			var newH = scatterview.h
+			var newLH = Math.max(scatterview.linechartH + dMouse[1],10);
+			scatterview.column.updateScatterSize(scatterview, newW, 
+			{
+				scatter: newH,
+				linechart: newLH			
+			});
+		});
+
+		scatterview.expandButton.on("click", function() 
 		{
 			scatterview.column.initiateToggleLinechartView(scatterview);
 		});
 
-	})(this.resizeButton, this.expandButton, this);
+	})(this);
 }
 
 ScatterView.prototype.setTimeRange = function(timeRange)
@@ -202,12 +211,7 @@ ScatterView.prototype.setTimeRange = function(timeRange)
 			updated = true;
 		}
 	}
-
-	if (!this.linechartTimeRange || this.linechartTimeRange[0] != timeRange[0] || this.linechartTimeRange[1] != timeRange[1])
-	{
-		// update line chart
-		this.updateLinechart();
-	}
+	this.updateLinechart();
 }
 
 ScatterView.prototype.getLinechartVisibility = function()
@@ -231,7 +235,10 @@ ScatterView.prototype.toggleLinechartView = function(startCallback, endCallback)
 						start();
 					}
 				})
-				.each("end", function() {
+				.each("end", function() 
+				{
+					scatterview.updateLinechart();
+
 					scatterview.linechartContent
 						.style("visibility", "visible");
 					if (end) {
@@ -293,7 +300,7 @@ ScatterView.prototype.updateSize = function(w, h)
 		.attr("transform", "translate(" + VAR_TEXT_SIZE + "," + this.h/2 + "),rotate(-90)");
 	this.xVarText
 		.attr("x", this.w/2).attr("y", VAR_TEXT_SIZE);
-	this.resizeButton
+	this.resizeScatter
 		.attr("x", this.w-BUTTON_SIZE-1)
 		.attr("y", this.h-BUTTON_SIZE-1);
 	this.expandButton
@@ -304,6 +311,9 @@ ScatterView.prototype.updateSize = function(w, h)
 		.attr("transform", "translate(0," + this.h + ")");
 	this.linechartRect
 		.attr("width", this.w);
+
+	// update line chart
+	this.updateLinechart();
 }
 
 
@@ -313,6 +323,7 @@ ScatterView.prototype.setXVar = function(xVar, dontRender)
 	this.xVarText.html(xVar);
 	this.xSeries = theData.generateOneSeries(xVar);
 	tempo.renderGL();
+	this.updateLinechart();
 }
 ScatterView.prototype.setYVar = function(yVar, dontRender)
 {
@@ -320,6 +331,7 @@ ScatterView.prototype.setYVar = function(yVar, dontRender)
 	this.yVarText.html(yVar);
 	this.ySeries = theData.generateOneSeries(yVar);
 	tempo.renderGL();
+	this.updateLinechart();
 }
 
 
@@ -371,18 +383,75 @@ ScatterView.prototype.getYDomain = function()
 
 ScatterView.prototype.updateLinechart = function()
 {
-	var pairedSeries = getPairedTimeseries(this.xVar, this.yVar);
-	var xSeries = pairedSeries.xSeries.getSeries();
-	var ySeries = pairedSeries.ySeries.getSeries();
-
-	var chunksX = [];
-	var chunksY = [];
-
-	for (var i=this.timeRange[0], len = Math.min(xSeries.length-1, this.timeRange[1]); i <= len; i++) {
-
-
+	if (!this.linechartVisibility)
+	{
+		return;
 	}
+	
+	if (!this.linechartTimeRange || this.linechartTimeRange[0] != this.timeRange[0] || this.linechartTimeRange[1] != this.timeRange[1])
+	{
+		var pairedSeries = getPairedTimeseries(this.xVar, this.yVar);
+
+		var xChunks = pairedSeries.xChunks;
+		var yChunks = pairedSeries.yChunks;
+
+		// determine range of chunks
+		var xRange = [ xChunks.chunkIndices[this.timeRange[0]], xChunks.chunkIndices[this.timeRange[1]] ];
+		var yRange = [ yChunks.chunkIndices[this.timeRange[0]], yChunks.chunkIndices[this.timeRange[1]] ];
+
+		// plot the chunks
+		var pathGenerator = d3.svg.line()
+			.x(function(d) { return d.x; })
+			.y(function(d) { return d.y; });
+
+		var xChunkData = [];
+		for (var i=Math.max(0, xRange[0]); i<=xRange[1]; i++) {
+			xChunkData.push({index: i, chunk: xChunks.chunks[i]});
+		}
+
+		var yChunkData = [];
+		for (var i=Math.max(0, yRange[0]); i<=yRange[1]; i++) {
+			yChunkData.push({index: i, chunk: yChunks.chunks[i]});
+		}
+
+		var xGroup = this.linechartContent.select("g.xLinechart");
+		var yGroup = this.linechartContent.select("g.yLinechart");
+
+		var xUpdate = xGroup.selectAll("path").data(xChunkData, function(d) { return d.index; });
+		xUpdate.enter().append("path");
+		xUpdate
+			.attr("vector-effect", "non-scaling-stroke")
+			.attr("d", function(d) { return pathGenerator(d.chunk); });
+		xUpdate.exit().remove();
+
+		
+		var yUpdate = yGroup.selectAll("path").data(yChunkData, function(d) { return d.index; });
+		yUpdate.enter().append("path");
+		yUpdate
+			.attr("vector-effect", "non-scaling-stroke")
+			.attr("d", function(d) { return pathGenerator(d.chunk); });
+		yUpdate.exit().remove();
+		
+
+		this.linechartTimeRange = [ this.timeRange[0], this.timeRange[1] ];	
+	}
+
+	// update the transform
+	var xScaleFactor = (this.w - LINECHART_PAD_W*2) / (this.timeRange[1]-this.timeRange[0]);
+	var xTranslate = -this.timeRange[0];
+
+	var yScaleFactor = this.linechartH - LINECHART_PAD_H*2
+	var yTranslate = 0;
+
+	var transform = 	
+		'translate(' + LINECHART_PAD_W + ',' + LINECHART_PAD_H + ') ' +
+		'scale(' + xScaleFactor + ',' + yScaleFactor + ') '	+
+		'translate(' + xTranslate + ',' + yTranslate + ')';
+
+	this.linechartContent.select("g.linechartData")
+		.attr("transform", transform);
 }
+
 
 // GL render
 // ==============
@@ -438,8 +507,8 @@ function getPairedTimeseries(xVar, yVar)
 					vertices.push( v1 );
 					vertices.push( v2 );
 
-					s1.push(v1);
-					s2.push(v2);		
+					s1[i] = v1;
+					s2[i] = v2;		
 				
 					// determine color based on the time of the day
 					var timestep = new Date(beginTime + i*timestepOffset);
@@ -461,8 +530,8 @@ function getPairedTimeseries(xVar, yVar)
 				else
 				{
 					indices.push(lastIndex);
-					s1.push(null);
-					s2.push(null);
+					s1[i] = null;
+					s2[i] = null;
 				}
 			}
 
@@ -487,8 +556,8 @@ function getPairedTimeseries(xVar, yVar)
 				xSeries: ts1,
 				ySeries: ts2,
 
-				xChunks: chunketize(ts1.getSeries(), theData.getTimeLength()),
-				yChunks: chunketize(ts2.getSeries(), theData.getTimeLength())
+				xChunks: chunketize(s1, theData.getTimeLength()),
+				yChunks: chunketize(s2, theData.getTimeLength())
 			};
 
 			// store in cache
@@ -498,20 +567,29 @@ function getPairedTimeseries(xVar, yVar)
 	return glData;
 }
 
+var INDEX_NULL=0;
+var INDEX_POINT=1;
+var INDEX_CHUNK=2;
+
 function chunketize(series, N)
 {
-	var chunk = null, chunks = null;
-	var points = [];
-	var indices = [];
+	var chunk = null, chunks = [], points = [];
+	var chunkIndices = []; chunkIndices.length = N;
+	var pointIndices = []; pointIndices.length = N;
+	var cIndex = -1, pIndex = -1;
 
-	for (var i=0, len = series.length; i<len; i++) 
+	for (var i = 0; i <= N; i++) 
 	{
-		var v = series[i];
+		var v = (i<N) ? series[i] : null;
 		if (v !== null && v !== undefined) 
 		{
 			if (!chunk) {
-				chunk = [{x: i/N, y: 1.0 - v}];
+				chunk = [];
 			}
+
+			chunk.push({x: i, y: 1.0 - v});
+			chunkIndices[i] = chunks.length;
+			pointIndices[i] = pIndex;
 		}
 		else
 		{
@@ -519,31 +597,30 @@ function chunketize(series, N)
 			{
 				if (chunk.length == 1) 
 				{
+					chunkIndices[i-1]--;
+					pointIndices[i-1] = points.length;
+					pIndex = points.length;
 					points.push(chunk[0]);
 				}
 				else
 				{
+					cIndex = chunks.length;
 					chunks.push(chunk);
+
 				}
 				chunk = null;
+			}
+
+			if (i<N) {
+				chunkIndices[i] = cIndex;
+				pointIndices[i] = pIndex;
 			}
 		}
 	}
 
-	if (chunk) {
-		if (chunk.length == 1) {
-			points.push(chunk[0]);
-		}
-		else
-		{
-			chunks.push(chunk);
-		}
-		chunk = null;	
-	}
-
 	return {
-		chunks: chunks,
-		points: points
+		chunks: chunks,	chunkIndices: chunkIndices,
+		points: points,	pointIndices: pointIndices
 	};
 }
 

@@ -58,6 +58,7 @@ Button.prototype.setCallback = function(callback) {
 
 // Inline button
 // ==============
+var RESIZE_CURSOR = false;
 function InlineButton(svg, x, y, w, h, img)
 {
 	this.dragging = false;
@@ -92,24 +93,58 @@ function InlineButton(svg, x, y, w, h, img)
 InlineButton.prototype.dragOn = function()
 {
 	this.dragging = true;
+	if (RESIZE_CURSOR) {
+		d3.select('body').style('cursor', 'nwse-resize');
+	}
 }
 
 InlineButton.prototype.dragOff = function()
 {
 	this.dragging = false;
 	this.image.style("visibility", "hidden");
+	if (RESIZE_CURSOR) {
+		d3.select('body').style('cursor', '');
+	}
 }
 
 InlineButton.prototype.on = function(event, callback)
 {
-	(function(button) 
+	(function(button, thisObject, event, callback) 
 	{
-		button.on(event, function(d) 
+		if (event == 'resize')
 		{
-			var thisContext = this;
-			callback.call(thisContext, d);
-		});
-	})(this.button);
+			button.on("mousedown", function() {
+				thisObject.dragOn();
+				thisObject.lastMouse = d3.mouse(button.node());
+				d3.select(window).on("mousemove.resizeInlineButton", function()
+				{
+					var mouse = d3.mouse(button.node());
+					var dMouse = [
+						mouse[0]-thisObject.lastMouse[0],
+						mouse[1]-thisObject.lastMouse[1]
+					];
+					thisObject.lastMouse = mouse;
+					callback.call(thisObject, dMouse);
+				});
+
+				d3.select(window).on("mouseup.resizeInlineButton", function()
+				{
+					thisObject.dragOff();
+					d3.select(window)
+						.on("mousemove.resizeInlineButton", null)
+						.on("mouseup.resizeInlineButton", null);
+				});
+			})
+		}
+		else
+		{
+			button.on(event, function(d) 
+			{
+				var thisContext = this;
+				callback.call(thisContext, d);
+			});
+		}
+	})(this.button, this, event, callback);
 	return this;
 }
 
@@ -131,6 +166,35 @@ function putNodeOnTop(node)
 {
 	var n = jQuery(node);
 	n.parent().append(n.detach());
+}
+
+// returns the SVG node starting from an element within
+function getSVG(element)
+{
+	if (element.nodeName.toUpperCase() === "SVG") {
+		return element;
+	}
+	else {
+		return getSVG(element.parentElement);
+	}
+}
+
+function emptyOrNullString(str)
+{
+	if (!str) return ""; else return str;
+}
+
+function getParentElement(element, parent, className)
+{
+	if (
+		(element.nodeName.toUpperCase() === parent.toUpperCase())
+		&& (!className || className.toUpperCase() === (emptyOrNullString(d3.select(element).attr("class"))).toUpperCase())
+	) {
+		return element;
+	}
+	else {
+		return getParentElement(element.parentElement, parent, className);
+	}
 }
 
 
