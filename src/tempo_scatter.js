@@ -318,8 +318,10 @@ ScatterView.prototype.updateSize = function(w, h)
 		.attr("transform", "translate(0," + this.h + ")");
 	
 	this.linechartRect
-		.attr("width", this.w)
-		.attr("height", this.linechartH);
+		.attr("width", this.w);
+	if (this.linechartVisibility) {
+		this.linechartRect.attr("height", this.linechartH);
+	}
 
 	// update line chart
 	this.updateLinechart();
