@@ -27,16 +27,15 @@ var DEF_LINECHART_VISIBILITY = false;
 var DEF_LINECHART_H = 40;
 var EXPAND_DURATION = 150;
 
+var SCATTER_ID = 0;
 
 function ScatterView(parentColumn, group, xVar, yVar, width, height, linechartH, linechartVisibility)
 {
+	this.scatterID = SCATTER_ID++;	// internal ID to uniquely identify defs
 	this.column = parentColumn
 	this.group = group;
 	this.xVar = xVar;
 	this.yVar = yVar;
-
-	this.defs = d3.select(getSVG(this.group.node())).select("defs");
-
 
 	// get the intersection between the two series
 	this.xSeries = theData.generateOneSeries(xVar);
@@ -119,18 +118,31 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height, linechartH,
 
 	})(this, this.group);
 
+
+	this.linechartW = DEF_SCATTER_W;
+	this.linechartH = linechartH || DEF_LINECHART_H;
+
+	// create a clipping rectangle for linechart view
+	var defs = d3.select(getSVG(this.group.node())).select("defs");
+	this.clipPathID = "linechartClip" + this.scatterID;
+	this.clipPath = defs.append("clipPath")
+		.attr("id", this.clipPathID);
+	this.clipRect = this.clipPath.append("rect")
+		.attr("width", this.w - LINECHART_PAD_W*2)
+		.attr("height", this.linechartH - LINECHART_PAD_H*2);
+
 	// create a group to show a linechart view of the time series
 	this.linechartVisibility = linechartVisibility !== undefined ? linechartVisibility : DEF_LINECHART_VISIBILITY;
 	this.linechartGroup = this.group.append("g")
 		.style("visibility", this.linechartVisibility ? "visible" : "hidden")
 		.attr("transform", "translate(0," + this.h + ")");
 
-	this.linechartW = DEF_SCATTER_W;
-	this.linechartH = linechartH || DEF_LINECHART_H;
-
 	this.linechartContent = this.linechartGroup.append("g")
 		.style("visibility", this.linechartVisibility ? "visible" : "hidden")
-	var linechartData = this.linechartContent.append("g").attr("class", "linechartData")
+		.attr('clip-path', 'url(#' + this.clipPathID + ')');
+	
+	var linechartData = this.linechartContent.append("g")
+		.attr("class", "linechartData");
 	linechartData.append("g").attr("class", "xLinechart");
 	linechartData.append("g").attr("class", "yLinechart");
 
@@ -322,6 +334,10 @@ ScatterView.prototype.updateSize = function(w, h)
 	if (this.linechartVisibility) {
 		this.linechartRect.attr("height", this.linechartH);
 	}
+	this.clipRect
+		.attr("width", this.w - LINECHART_PAD_W*2)
+		.attr("height", this.linechartH - LINECHART_PAD_H*2)
+		.attr("x", LINECHART_PAD_W).attr("y", LINECHART_PAD_H);
 
 	// update line chart
 	this.updateLinechart();
@@ -334,7 +350,7 @@ ScatterView.prototype.setXVar = function(xVar, dontRender)
 	this.xVarText.html(xVar);
 	this.xSeries = theData.generateOneSeries(xVar);
 	tempo.renderGL();
-	this.updateLinechart();
+	this.updateLinechart(true);
 }
 ScatterView.prototype.setYVar = function(yVar, dontRender)
 {
@@ -342,7 +358,7 @@ ScatterView.prototype.setYVar = function(yVar, dontRender)
 	this.yVarText.html(yVar);
 	this.ySeries = theData.generateOneSeries(yVar);
 	tempo.renderGL();
-	this.updateLinechart();
+	this.updateLinechart(true);
 }
 
 
@@ -392,14 +408,14 @@ ScatterView.prototype.getYDomain = function()
 	return this.ySeries.getExtents();
 }
 
-ScatterView.prototype.updateLinechart = function()
+ScatterView.prototype.updateLinechart = function(forceUpdate)
 {
 	if (!this.linechartVisibility)
 	{
 		return;
 	}
 	
-	if (!this.linechartTimeRange || this.linechartTimeRange[0] != this.timeRange[0] || this.linechartTimeRange[1] != this.timeRange[1])
+	if (forceUpdate || !this.linechartTimeRange || this.linechartTimeRange[0] != this.timeRange[0] || this.linechartTimeRange[1] != this.timeRange[1])
 	{
 		var pairedSeries = getPairedTimeseries(this.xVar, this.yVar);
 
