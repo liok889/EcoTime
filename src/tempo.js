@@ -17,12 +17,12 @@ var COLUMN_Y = 100;
 var COLUMN_SPACING = 0;
 
 // default column variable
-var DEF_COLUMN_VARIABLE = 'fc';
-var DEF_SLIDER_LENGTH = 75;
+var DEF_COLUMN_VARIABLE = 'GPP_WithUstar_f';
+var DEF_SLIDER_LENGTH = 110;
 var DEF_SLIDER_MIN_LENGTH = 15;
 
 // list of interesting variables to choose from
-var INTERESTING_VARS = ['PRIsn', 'LE', 'Tair', 'VPD'];
+var INTERESTING_VARS = ['Ustar', 'LE', 'Tair', 'VPD', 'hour'];
 var ADD_ALL_INTERESTING = true;
 var SLIDER_OPACITY = 0.8;
 
@@ -603,7 +603,9 @@ Tempo.prototype.renderGL = function()
 					// update the uniform
 					if (SHOW_SCATTER_POINTS)
 					{
-						gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+						//gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+						gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
 						gl.enable(gl.BLEND);
 
 						ps.useShader();

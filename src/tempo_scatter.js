@@ -5,8 +5,8 @@
  */
 
 // default dimensions of the scatterplot view
-var DEF_SCATTER_W = 120;
-var DEF_SCATTER_H = 120;
+var DEF_SCATTER_W = 180;
+var DEF_SCATTER_H = 135;
 
 // size of inline buttons
 var BUTTON_SIZE = 10;
@@ -24,7 +24,7 @@ var VAR_SELECTION_POPUP_H = 350;
 
 // default linechart
 var DEF_LINECHART_VISIBILITY = false;
-var DEF_LINECHART_H = 40;
+var DEF_LINECHART_H = 30;
 var EXPAND_DURATION = 150;
 
 var SCATTER_ID = 0;
@@ -370,6 +370,8 @@ ScatterView.prototype.getGroup = function()
 
 ScatterView.prototype.updateSize = function(w, h)
 {
+	var oldW = this.w, oldH = this.h;
+
 	this.w = w || this.w;
 	this.h = h ? h.scatter : this.h;
 	this.linechartH = h ? h.linechart : this.linechartH;
@@ -413,6 +415,35 @@ ScatterView.prototype.updateSize = function(w, h)
 	this.xB.domain([0, this.w - SCATTER_PAD*2]);
 	this.yB.domain([0, this.h - SCATTER_PAD*2]);
 	this.brush.x(this.xB).y(this.yB);
+
+	if (!this.brush.empty()) 
+	{
+		// adapt brush extents
+		var e = this.brush.extent();
+		var xInverseScale = d3.scale.linear()
+			.domain([0, oldW - SCATTER_PAD*2])
+			.range(this.getXDomain());
+					
+		var yDomain = this.getYDomain();
+		var yInverseScale = d3.scale.linear()
+			.domain([0, oldH - SCATTER_PAD*2])
+			.range([yDomain[1], yDomain[0]]);
+
+		var xNewScale = d3.scale.linear()
+			.domain(this.getXDomain())
+			.range([0, this.w - SCATTER_PAD*2]);
+		var yNewScale = d3.scale.linear()
+			.domain(this.getYDomain())
+			.range([this.h - SCATTER_PAD*2, 0]);
+		var 
+			x0 = xNewScale(xInverseScale(e[0][0])), 
+			x1 = xNewScale(xInverseScale(e[1][0])), 
+			y0 = yNewScale(yInverseScale(e[0][1])), 
+			y1 = yNewScale(yInverseScale(e[1][1]));
+			
+		this.brush.extent([[x0, y0], [x1, y1]]);
+
+	}
 	this.brushGroup.select(".brush").call(this.brush);
 }
 
