@@ -14,7 +14,7 @@ circle.timeline
 }
 
 rect.scatterBorderRect {
-	stroke: #dddddd;
+	stroke: #eeeeee;
 	stroke-width: 0.5px;
 	fill: white;
 	fill-opacity: 0.0;
@@ -68,12 +68,22 @@ rect.scatterBorderRect {
 
 .linechartData {
 	fill: none;
-	stroke-width: 0.5px;
+	stroke-width: 1px;
+	stroke-opacity: 0.8;
 }
 .xLinechart {
-	stroke: #4d4d4d;
+	stroke: black;
 }
 
 .yLinechart {
-	stroke: #d6604d;
+	stroke: #b2182b;
+	/* slightly lighter shade of red #d6604d */
+}
+
+.brush .extent 
+{
+	stroke: white;
+	fill-opacity: 0.15;
+	/*shape-rendering: crispEdges;*/
+	stroke-width: 0.5px;
 }

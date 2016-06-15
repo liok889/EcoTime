@@ -131,6 +131,7 @@
 	<script id="shader-vs-points" type="x-shader/x-vertex">
 		precision mediump float;
 		attribute vec2 aVertexPosition;
+		attribute vec2 aVertexFilter;
 
 		uniform mat4 uMVMatrix;
 		uniform mat4 uPMatrix;
@@ -140,6 +141,16 @@
 		uniform vec2 domainMin;
 		uniform vec2 domainLen;
 		uniform float pointSize;
+		uniform float pointOpacity;
+		
+		// filter, to be used in brushing and linking
+		uniform bool filter;
+		uniform vec2 filterMin;
+		uniform vec2 filterMax;
+
+		// color of point, to pass to fragment shader
+		varying lowp vec4 pointColor;
+
 		    
 		void main(void) 
 		{
@@ -149,19 +160,48 @@
 			
 			// the size of the point
 			gl_PointSize = pointSize;
+
+			// see if we are filter
+			if (filter) {
+
+				bvec2 exclude = equal(aVertexFilter, vec2(9999.0));
+				if (any(exclude)) {
+					pointColor = vec4(0, 0, 0, 0.5);
+				}
+				else
+				{
+					bvec2 m0 = greaterThanEqual(aVertexFilter, filterMin);
+					bvec2 m1 = lessThanEqual(aVertexFilter, filterMax);
+					
+					if (all(m0) && all(m1)) 
+					{
+						// brush
+						pointColor = vec4(0.16, 0, 0, 1);
+					}
+					else
+					{
+						pointColor = vec4(0, 0, 0, 0.65);
+					}
+				}
+			}
+			else
+			{
+				pointColor = vec4(0, 0, 0, 1);
+			}
 		}
 
 	</script>
 
 	<script id="shader-fs-points" type="x-shader/x-fragment">
 		precision mediump float;
+		varying lowp vec4 pointColor;
 		uniform float pointOpacity;
 		
 		void main() 
 		{
 			float dist = distance( gl_PointCoord, vec2(0.5) );
 			float alpha = 1.0 - smoothstep(0.45,0.5,dist);
-			gl_FragColor = vec4(0, 0, 0, alpha * pointOpacity);
+			gl_FragColor = vec4(pointColor.rgb, pointColor.a * alpha * pointOpacity);
 		}
 	</script>
 
@@ -268,7 +308,7 @@
 				tempo.renderGL();
 			}
 		}
-		window.onresize = resizeWindow;
+		//window.onresize = resizeWindow;
 
 		function initUI()
 		{

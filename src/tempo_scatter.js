@@ -53,6 +53,69 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height, linechartH,
 	// create text to show variable names
 	(function(scatterview, group)
 	{
+		// create brush
+		scatterview.brushGroup = scatterview.group.append("g")
+			.attr("transform", 'translate(' + SCATTER_PAD + ',' + SCATTER_PAD + ')');
+
+		scatterview.xB = d3.scale.identity().domain([0, scatterview.w - SCATTER_PAD*2]);
+		scatterview.yB = d3.scale.identity().domain([0, scatterview.h - SCATTER_PAD*2]);
+		scatterview.brush = d3.svg.brush()
+			.x(scatterview.xB).y(scatterview.yB)
+			.on("brushstart", function() {
+				tempo.setScatterFilter();
+			})
+			.on("brush", function() 
+			{
+				var e = scatterview.brush.extent();
+
+				if (e[0][0] == e[1][0] || e[0][1] == e[1][1])
+				{
+					// brush is pretty much empty
+					tempo.setScatterFilter();
+				}
+				else {
+					var xInverseScale = d3.scale.linear()
+						.domain([0, scatterview.w - SCATTER_PAD*2])
+						.range(scatterview.getXDomain());
+					
+					var yDomain = scatterview.getYDomain();
+					var yInverseScale = d3.scale.linear()
+						.domain([0, scatterview.h - SCATTER_PAD*2])
+						.range([yDomain[1], yDomain[0]]);
+
+					var 
+						x0 = xInverseScale(e[0][0]), 
+						x1 = xInverseScale(e[1][0]), 
+						y0 = yInverseScale(e[0][1]), 
+						y1 = yInverseScale(e[1][1]);
+
+					var scatterFilter = {
+						xFilterVar: scatterview.xVar,
+						yFilterVar: scatterview.yVar,
+						
+						// ranges
+						xFilterRange: [
+							Math.min( x0, x1 ),
+							Math.max( x0, x1 )
+						],
+							
+						yFilterRange: [
+							Math.min( y0, y1 ),
+							Math.max( y0, y1 )
+						]
+
+					};
+					tempo.setScatterFilter(scatterFilter);
+				}
+			})
+			.on("brushend", function() {
+				scatterview.brushGroup.select(".brush").call(scatterview.brush.clear());
+			});
+		scatterview.brushGroup.append('g')
+			.attr('class', 'brush')
+			.call(scatterview.brush);
+
+		// create variable text
 		scatterview.yVarText = group.append("text")
 			.html(scatterview.yVar)
 			.style("font-size", (1+VAR_TEXT_SIZE) + "px")
@@ -341,6 +404,12 @@ ScatterView.prototype.updateSize = function(w, h)
 
 	// update line chart
 	this.updateLinechart();
+
+	// brush parameters
+	this.xB.domain([0, this.w - SCATTER_PAD*2]);
+	this.yB.domain([0, this.h - SCATTER_PAD*2]);
+	this.brush.x(this.xB).y(this.yB);
+	this.brushGroup.select(".brush").call(this.brush);
 }
 
 
@@ -485,10 +554,11 @@ ScatterView.prototype.updateLinechart = function(forceUpdate)
 // cache to store vertex buffers of the differnet time series combination
 var glCache = d3.map();
 
-// rendering function
-function getPairedTimeseries(xVar, yVar)
+// function to construct paired time series and put them in buffers
+function getPairedTimeseries(xVar, yVar, xFilter, yFilter)
 {
 	var cacheName = xVar + "_**_" + yVar;
+
 	var glData = glCache.get(cacheName);
 	if (!glData)
 	{
@@ -511,7 +581,7 @@ function getPairedTimeseries(xVar, yVar)
 			var xSeries = theData.generateOneSeries(xVar).getSeries();
 			var ySeries = theData.generateOneSeries(yVar).getSeries();
 
-			var N = Math.min(xSeries.length, ySeries.length);
+			var N = theData.getTimeLength();
 
 			// begining / end timestep
 			var beginTime = theData.getStartDate().getTime();
@@ -594,9 +664,40 @@ function getPairedTimeseries(xVar, yVar)
 	return glData;
 }
 
-var INDEX_NULL=0;
-var INDEX_POINT=1;
-var INDEX_CHUNK=2;
+function getPairedFilter(xVar, yVar, xFilterVar, yFilterVar)
+{
+	// create arrays for vertices and colors
+	var xSeries = theData.generateOneSeries(xVar).getSeries();
+	var ySeries = theData.generateOneSeries(yVar).getSeries();
+
+	var xFilter = theData.generateOneSeries(xFilterVar).getSeries();
+	var yFilter = theData.generateOneSeries(yFilterVar).getSeries();
+
+	var filterVertices = [];
+
+	for (var i=0, N=theData.getTimeLength(); i<N; i++) 
+	{
+		var v1 = xSeries[i]; var b1 = v1 !== null && v1 !== undefined;
+		var v2 = ySeries[i]; var b2 = v2 !== null && v2 !== undefined;	
+		var f1 = xFilter[i], f2 = yFilter[i];
+
+		if (b1 && b2)  
+		{
+			if (f1 === null || f1 === undefined) { f1 = 9999.0; }
+			if (f2 === null || f2 === undefined) { f2 = 9999.0; }
+
+			filterVertices.push( f1 );
+			filterVertices.push( f2 );
+		}
+	}
+
+	// create 2 buffers (vertices and colors) and upload
+	var filterBuffer = gl.createBuffer();
+	gl.bindBuffer(gl.ARRAY_BUFFER, filterBuffer);
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(filterVertices), gl.STATIC_DRAW);
+
+	return filterBuffer;
+}
 
 function chunketize(series, N)
 {

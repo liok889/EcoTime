@@ -433,9 +433,10 @@ Tempo.prototype.realignColumns = function(instigator, scatterHeights)
 	
 }
 
-Tempo.prototype.showTimelineDrawer = function()
+Tempo.prototype.setScatterFilter = function(filter)
 {
-
+	this.scatterFilter = filter;
+	this.renderGL();
 }
 
 Tempo.prototype.renderGL = function()
@@ -465,6 +466,19 @@ Tempo.prototype.renderGL = function()
 	gl.lineWidth(LINE_WIDTH);
 
 	// initialize shader
+	if (!this.pointsShader) 
+	{
+		this.pointsShader = new Shader(gl,
+			getShader(gl, 'shader-vs-points'),
+			getShader(gl, 'shader-fs-points'), 
+			['aVertexPosition', 'aVertexFilter'],
+			[	'pointOpacity', 'pointSize',
+				'uPMatrix', 'uMVMatrix', 'rangeMin', 'rangeLen', 'domainMin', 'domainLen',
+				'filter', 'filterMin', 'filterMax'
+			]
+		);
+	}
+
 	if (!this.linesShader) 
 	{
 		this.linesShader = new Shader(gl,
@@ -475,17 +489,6 @@ Tempo.prototype.renderGL = function()
 		);
 	}
 
-	if (!this.pointsShader) 
-	{
-		this.pointsShader = new Shader(gl,
-			getShader(gl, 'shader-vs-points'),
-			getShader(gl, 'shader-fs-points'), 
-			['aVertexPosition'],
-			[	'pointOpacity', 'pointSize',
-				'uPMatrix', 'uMVMatrix', 'rangeMin', 'rangeLen', 'domainMin', 'domainLen'
-			]
-		);
-	}
 
 	// clear
 	gl.clear(gl.COLOR_BUFFER_BIT);
@@ -548,6 +551,29 @@ Tempo.prototype.renderGL = function()
 
 			// render
 			var glData = getPairedTimeseries(view.getXVar(), view.getYVar());
+			var filterBuffer = null;
+
+			// see if we have a filter set
+			if (this.scatterFilter)
+			{
+				var xFilterVar = this.scatterFilter.xFilterVar;
+				var yFilterVar = this.scatterFilter.yFilterVar;
+
+				// see if we have a cached filter for this paired series and filter pair
+				if (!glData.filters) glData.filters = d3.map();
+				var filterKey = xFilterVar + "_$$_" + yFilterVar;
+				filterBuffer = glData.filters.get(filterKey);
+
+				if (!filterBuffer) 
+				{
+					// construct a filter for this pair
+					filterBuffer = getPairedFilter(view.getXVar(), view.getYVar(), xFilterVar, yFilterVar);
+
+					// store it
+					glData.filters.set(filterKey, filterBuffer);
+				}
+			}
+
 
 			// determine draw range
 			var i0 = glData.indices[ timeRange[0] ];
@@ -572,8 +598,22 @@ Tempo.prototype.renderGL = function()
 						gl.uniform2fv(ps.uniform('domainLen'), new Float32Array(domainLen));
 						gl.uniform1f(ps.uniform('pointSize'), POINT_SIZE);
 						gl.uniform1f(ps.uniform('pointOpacity'), POINT_OPACITY);
+						gl.uniform1i(ps.uniform('filter'), this.scatterFilter ? 1 : 0);
+						
+						if (this.scatterFilter) 
+						{
+							var xFilterRange = this.scatterFilter.xFilterRange;
+							var yFilterRange = this.scatterFilter.yFilterRange;
+							var filterMin = [xFilterRange[0], yFilterRange[0]];
+							var filterMax = [xFilterRange[1], yFilterRange[1]];
+
+							gl.uniform2fv(ps.uniform('filterMin'), new Float32Array(filterMin));
+							gl.uniform2fv(ps.uniform('filterMax'), new Float32Array(filterMax));
+						}
 						
 						ps.attrib2buffer('aVertexPosition', glData.vertexBuffer, 2);
+						ps.attrib2buffer('aVertexFilter', filterBuffer !== null ? filterBuffer : glData.vertexBuffer, 2);
+
 						gl.drawArrays(gl.POINTS, i0, drawLen);
 
 						ps.unuseShader();
@@ -585,16 +625,24 @@ Tempo.prototype.renderGL = function()
 						gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 						gl.enable(gl.BLEND);
 
-
 						// update the uniform
 						ls.useShader();
 						ls.attrib2buffer('aVertexPosition', glData.vertexBuffer, 2);
 						ls.attrib2buffer('aVertexColor', glData.colorBuffer, 4);
+						//ls.attrib2buffer('aVertexFilter', filterBuffer !== null ? filterBuffer : glData.vertexBuffer)l;
 
 						gl.uniform2fv(ls.uniform('rangeMin'), new Float32Array(rangeMin));
 						gl.uniform2fv(ls.uniform('rangeLen'), new Float32Array(rangeLen));
 						gl.uniform2fv(ls.uniform('domainMin'), new Float32Array(domainMin));
 						gl.uniform2fv(ls.uniform('domainLen'), new Float32Array(domainLen));
+						
+						/*
+						gl.uniform1i(ls.uniform('filter'), this.scatterFilter ? 1 : 0);
+						if (this.scatterFilter) {
+							gl.uniform2fv(ls.uniform('xFilterRange'), new Float32Array(this.scatterFilter.xFilterRange));
+							gl.uniform2fv(ls.uniform('yFilterRange'), new Float32Array(this.scatterFilter.yFilterRange));
+						}
+						*/
 						
 						gl.uniform1i(ls.uniform('singleColor'), 1);
 						gl.drawArrays(gl.LINE_STRIP, i0, drawLen);
@@ -604,7 +652,6 @@ Tempo.prototype.renderGL = function()
 
 						ls.unuseShader();
 						gl.disable(gl.BLEND);
-
 					}
 				}
 			}
