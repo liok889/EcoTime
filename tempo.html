@@ -150,7 +150,6 @@
 
 		// color of point, to pass to fragment shader
 		varying lowp vec4 pointColor;
-
 		    
 		void main(void) 
 		{
@@ -166,7 +165,7 @@
 
 				bvec2 exclude = equal(aVertexFilter, vec2(9999.0));
 				if (any(exclude)) {
-					pointColor = vec4(0, 0, 0, 0.5);
+					pointColor = vec4(0, 0, 0, 1);
 				}
 				else
 				{
@@ -180,7 +179,7 @@
 					}
 					else
 					{
-						pointColor = vec4(0, 0, 0, 1/*0.65*/);
+						pointColor = vec4(0, 0, 0, 1);
 					}
 				}
 			}

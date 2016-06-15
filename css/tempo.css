@@ -82,8 +82,8 @@ rect.scatterBorderRect {
 
 .brush .extent 
 {
-	stroke: white;
+	stroke: #555555;
 	fill-opacity: 0.15;
-	/*shape-rendering: crispEdges;*/
+	shape-rendering: crispEdges;
 	stroke-width: 0.5px;
 }
