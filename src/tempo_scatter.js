@@ -62,7 +62,7 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height, linechartH,
 		scatterview.brush = d3.svg.brush()
 			.x(scatterview.xB).y(scatterview.yB)
 			.on("brushstart", function() {
-				tempo.setScatterFilter();
+				tempo.startBrush(scatterview);
 			})
 			.on("brush", function() 
 			{
@@ -109,7 +109,6 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height, linechartH,
 				}
 			})
 			.on("brushend", function() {
-				scatterview.brushGroup.select(".brush").call(scatterview.brush.clear());
 			});
 		scatterview.brushGroup.append('g')
 			.attr('class', 'brush')
@@ -271,6 +270,11 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height, linechartH,
 		});
 
 	})(this);
+}
+
+ScatterView.prototype.clearBrush = function()
+{
+	this.brushGroup.select('.brush').call(this.brush.clear());
 }
 
 ScatterView.prototype.setTimeRange = function(timeRange)

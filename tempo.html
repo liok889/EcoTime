@@ -180,7 +180,7 @@
 					}
 					else
 					{
-						pointColor = vec4(0, 0, 0, 0.65);
+						pointColor = vec4(0, 0, 0, 1/*0.65*/);
 					}
 				}
 			}
@@ -308,7 +308,7 @@
 				tempo.renderGL();
 			}
 		}
-		//window.onresize = resizeWindow;
+		window.onresize = resizeWindow;
 
 		function initUI()
 		{

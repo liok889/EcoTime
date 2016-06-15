@@ -439,6 +439,18 @@ Tempo.prototype.setScatterFilter = function(filter)
 	this.renderGL();
 }
 
+Tempo.prototype.startBrush = function(instigator)
+{
+	for (var i=0, N=this.columns.length; i<N) {
+		var column = this.columns[i].column;
+		var views = column.getViews();
+		for (var j=0, M=views.length; j<M; j++) {
+			if (views[j] != instigator) {
+				views[j].clearBrush();
+			}
+		}
+	}
+}
 Tempo.prototype.renderGL = function()
 {
 
