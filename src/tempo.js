@@ -499,8 +499,11 @@ Tempo.prototype.renderGL = function()
 		this.linesShader = new Shader(gl,
 			getShader(gl, 'shader-vs-lines'),
 			getShader(gl, 'shader-fs-lines'), 
-			['aVertexPosition', 'aVertexColor'],
-			['singleColor', 'uPMatrix', 'uMVMatrix', 'rangeMin', 'rangeLen', 'domainMin', 'domainLen']
+			['aVertexPosition', 'aVertexColor', 'aVertexFilter'],
+			[
+				'singleColor', 'uPMatrix', 'uMVMatrix', 'rangeMin', 'rangeLen', 'domainMin', 'domainLen',
+				'filter', 'filterMin', 'filterMax'
+			]
 		);
 	}
 
@@ -639,20 +642,35 @@ Tempo.prototype.renderGL = function()
 				
 					if (SHOW_SCATTER_LINES)
 					{
-						gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+						//gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+						gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 						gl.enable(gl.BLEND);
 
 						// update the uniform
 						ls.useShader();
-						ls.attrib2buffer('aVertexPosition', glData.vertexBuffer, 2);
-						ls.attrib2buffer('aVertexColor', glData.colorBuffer, 4);
-						//ls.attrib2buffer('aVertexFilter', filterBuffer !== null ? filterBuffer : glData.vertexBuffer)l;
+						gl.uniform1i(ls.uniform('filter'), this.scatterFilter ? 1 : 0);
+						
+						if (this.scatterFilter) 
+						{
+							var xFilterRange = this.scatterFilter.xFilterRange;
+							var yFilterRange = this.scatterFilter.yFilterRange;
+							var filterMin = [xFilterRange[0], yFilterRange[0]];
+							var filterMax = [xFilterRange[1], yFilterRange[1]];
+
+							gl.uniform2fv(ls.uniform('filterMin'), new Float32Array(filterMin));
+							gl.uniform2fv(ls.uniform('filterMax'), new Float32Array(filterMax));
+						}
 
 						gl.uniform2fv(ls.uniform('rangeMin'), new Float32Array(rangeMin));
 						gl.uniform2fv(ls.uniform('rangeLen'), new Float32Array(rangeLen));
 						gl.uniform2fv(ls.uniform('domainMin'), new Float32Array(domainMin));
 						gl.uniform2fv(ls.uniform('domainLen'), new Float32Array(domainLen));
 						
+						ls.attrib2buffer('aVertexPosition', glData.vertexBuffer, 2);
+						ls.attrib2buffer('aVertexColor', glData.colorBuffer, 4);
+						ls.attrib2buffer('aVertexFilter', filterBuffer !== null ? filterBuffer : glData.vertexBuffer, 2);
+						
+
 						/*
 						gl.uniform1i(ls.uniform('filter'), this.scatterFilter ? 1 : 0);
 						if (this.scatterFilter) {

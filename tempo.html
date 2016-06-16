@@ -5,7 +5,6 @@
 
 	<!-- css -->
 	<link href='css/tempo.css' rel='stylesheet' type='text/css'>
-
 	
 	<link href='https://fonts.googleapis.com/css?family=Lato:400,300,700' rel='stylesheet' type='text/css'>
 	<link href='https://fonts.googleapis.com/css?family=Anonymous+Pro:400,700' rel='stylesheet' type='text/css'>
@@ -169,6 +168,7 @@
 
 				bvec2 exclude = equal(aVertexFilter, vec2(9999.0));
 				if (any(exclude)) {
+					// not within filter
 					pointColor = vec4(COLOR, 1);
 				}
 				else
@@ -178,18 +178,19 @@
 					
 					if (all(m0) && all(m1)) 
 					{
-						// brush
-						//pointColor = vec4(0.2, 0, 0, 1.37);
+						// ** Highlight
 						pointColor = vec4(HI_COLOR, 1.65);
 					}
 					else
 					{
+						// not within filter
 						pointColor = vec4(COLOR, 1);
 					}
 				}
 			}
 			else
 			{
+				// no filter; normal color
 				pointColor = vec4(COLOR, 1);
 			}
 		}
@@ -212,8 +213,11 @@
 
 	<!-- connected scatterplot shader -->
 	<script id="shader-vs-lines" type="x-shader/x-vertex">
+		precision mediump float;
 		attribute vec2 aVertexPosition;
 		attribute vec4 aVertexColor;   
+		attribute vec2 aVertexFilter;
+
 		uniform mat4 uMVMatrix;
 		uniform mat4 uPMatrix;
 		uniform vec2 rangeMin;
@@ -222,13 +226,51 @@
 		uniform vec2 domainLen;
 		uniform bool singleColor;
 
+		// filter, to be used in brushing and linking
+		uniform bool filter;
+		uniform vec2 filterMin;
+		uniform vec2 filterMax;
+
 		// color
 		varying lowp vec4 vColor;
+		varying lowp float inFilter;
 				    
-		void main(void) {
+		void main(void) 
+		{
 			vec2 p = ((aVertexPosition - domainMin) / domainLen);
 			p.y = 1.0 - p.y;
 			gl_Position = uPMatrix * uMVMatrix * vec4(p * rangeLen + rangeMin, 0.0, 1.0);
+
+			// see if we are filter
+			if (filter) {
+
+				bvec2 exclude = equal(aVertexFilter, vec2(9999.0));
+				if (any(exclude)) {
+					// not within filter
+					inFilter = 0.0;
+				}
+				else
+				{
+					bvec2 m0 = greaterThanEqual(aVertexFilter, filterMin);
+					bvec2 m1 = lessThanEqual(aVertexFilter, filterMax);
+					
+					if (all(m0) && all(m1)) 
+					{
+						// ** in Filter
+						inFilter = 1.0;
+					}
+					else
+					{
+						// not within filter
+						inFilter = 0.0;
+					}
+				}
+			}
+			else
+			{
+				inFilter = 1.0;
+			}
+
 			if (singleColor) {
 				vColor = vec4(1.0, 0.678, 0.2, 0.85);
 			}
@@ -240,9 +282,13 @@
 	</script>
 
 	<script id="shader-fs-lines" type="x-shader/x-fragment">
+		precision mediump float;
 		varying lowp vec4 vColor;
+		varying lowp float inFilter;
+		const float MAX_LINE_OPACITY = 0.7;
+
 		void main(void) {
-			gl_FragColor = vColor;
+			gl_FragColor = vec4(vColor.rgb, MAX_LINE_OPACITY * vColor.a * smoothstep(0.5, 0.9, inFilter));
 		}
 	</script>
 
