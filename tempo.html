@@ -285,7 +285,7 @@
 		precision mediump float;
 		varying lowp vec4 vColor;
 		varying lowp float inFilter;
-		const float MAX_LINE_OPACITY = 0.7;
+		const float MAX_LINE_OPACITY = 1.0;
 
 		void main(void) {
 			gl_FragColor = vec4(vColor.rgb, MAX_LINE_OPACITY * vColor.a * smoothstep(0.5, 0.9, inFilter));

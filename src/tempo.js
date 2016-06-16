@@ -618,7 +618,11 @@ Tempo.prototype.renderGL = function()
 						gl.uniform2fv(ps.uniform('domainLen'), new Float32Array(domainLen));
 						gl.uniform1f(ps.uniform('pointSize'), POINT_SIZE);
 						gl.uniform1f(ps.uniform('pointOpacity'), POINT_OPACITY);
-						gl.uniform1i(ps.uniform('filter'), this.scatterFilter ? 1 : 0);
+						
+						// only apply point filter (i.e., brushing) if we're not showing lines
+						// otherwise the color of the brushed points intefers with line perception
+						var pointFilter = SHOW_SCATTER_LINES ? false : this.scatterFilter ? true : false;
+						gl.uniform1i(ps.uniform('filter'), pointFilter ? 1 : 0);
 						
 						if (this.scatterFilter) 
 						{
@@ -642,8 +646,8 @@ Tempo.prototype.renderGL = function()
 				
 					if (SHOW_SCATTER_LINES)
 					{
-						//gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-						gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+						gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+						//gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 						gl.enable(gl.BLEND);
 
 						// update the uniform

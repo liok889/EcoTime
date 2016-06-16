@@ -6,7 +6,7 @@
 
 // default dimensions of the scatterplot view
 var DEF_SCATTER_W = 180;
-var DEF_SCATTER_H = 135;
+var DEF_SCATTER_H = 115;
 
 // size of inline buttons
 var BUTTON_SIZE = 10;
