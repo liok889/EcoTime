@@ -149,11 +149,14 @@ ListSelection.prototype.hoverIndex = function(index)
 {
 	if (index !== undefined && index !== null)
 	{	
-		(function(listSelector, index) {
-			listSelector.theList
+		(function(thisSelector, index) {
+			thisSelector.theList
 				.style("background-color", function(d, i) {
 					return i==index ? SELECTION_HOVER_COLOR : ''
 				});
+			if (thisSelector.hoverCallback) {
+				thisSelector.hoverCallback(thisSelector.theList.data()[index]);
+			}
 		})(this, index);
 	}
 	else
