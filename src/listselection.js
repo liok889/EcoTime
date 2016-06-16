@@ -55,6 +55,16 @@ function ListSelection(x, y, width, height, selections)
 			});
 		}, 100);
 	})(this);
+
+	// see which corner to anchor the list at, depending
+	// on how much space we have available in the window
+	var winW = window.innerWidth; var winH = window.innerHeight;
+	var bounds = this.div.node().getBoundingClientRect();
+	var divW = bounds.right-bounds.left, divH = bounds.bottom-bounds.top;
+	if (x + divW > winW) { x -= divW; this.div.style("left", (x+2) + "px"); }
+	if (y + divH > winH) { y -= divH; this.div.style("top",  (y+2) + "px"); }
+
+
 }
 
 ListSelection.prototype.close = function()
