@@ -44,7 +44,7 @@ rect.scatterBorderRect {
 .listSelectionDiv {
 	position: absolute;
 	z-index: 100;
-	overflow-y: scroll;
+	/*overflow-y: scroll;*/
 	background-color: white;
 	border: solid 1px #cccccc;
 	line-height: 90%;
@@ -56,6 +56,11 @@ rect.scatterBorderRect {
 	-ms-user-select: none;
 	user-select: none;
 	cursor: default;
+}
+
+.listSelectionInput {
+	font-family: 'Anonymous Pro', 'Helvetica';
+	font-size: 11px;
 }
 
 .timeAxis text {font-family: Helvetica, sans-serif; font-size: 10px;}

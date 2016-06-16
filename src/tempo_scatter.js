@@ -66,47 +66,7 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height, linechartH,
 			})
 			.on("brush", function() 
 			{
-				var e = scatterview.brush.extent();
-
-				if (e[0][0] == e[1][0] || e[0][1] == e[1][1])
-				{
-					// brush is pretty much empty
-					tempo.setScatterFilter();
-				}
-				else {
-					var xInverseScale = d3.scale.linear()
-						.domain([0, scatterview.w - SCATTER_PAD*2])
-						.range(scatterview.getXDomain());
-					
-					var yDomain = scatterview.getYDomain();
-					var yInverseScale = d3.scale.linear()
-						.domain([0, scatterview.h - SCATTER_PAD*2])
-						.range([yDomain[1], yDomain[0]]);
-
-					var 
-						x0 = xInverseScale(e[0][0]), 
-						x1 = xInverseScale(e[1][0]), 
-						y0 = yInverseScale(e[0][1]), 
-						y1 = yInverseScale(e[1][1]);
-
-					var scatterFilter = {
-						xFilterVar: scatterview.xVar,
-						yFilterVar: scatterview.yVar,
-						
-						// ranges
-						xFilterRange: [
-							Math.min( x0, x1 ),
-							Math.max( x0, x1 )
-						],
-							
-						yFilterRange: [
-							Math.min( y0, y1 ),
-							Math.max( y0, y1 )
-						]
-
-					};
-					tempo.setScatterFilter(scatterFilter);
-				}
+				scatterview.doScatterBrush();
 			})
 			.on("brushend", function() {
 			});
@@ -270,6 +230,50 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height, linechartH,
 		});
 
 	})(this);
+}
+
+ScatterView.prototype.doScatterBrush = function()
+{
+	var e = this.brush.extent();
+
+	if (e[0][0] == e[1][0] || e[0][1] == e[1][1] || this.brush.empty())
+	{
+		// brush is pretty much empty
+		tempo.setScatterFilter();
+	}
+	else {
+		var xInverseScale = d3.scale.linear()
+			.domain([0, this.w - SCATTER_PAD*2])
+			.range(this.getXDomain());
+					
+		var yDomain = this.getYDomain();
+		var yInverseScale = d3.scale.linear()
+			.domain([0, this.h - SCATTER_PAD*2])
+			.range([yDomain[1], yDomain[0]]);
+
+		var 
+			x0 = xInverseScale(e[0][0]), 
+			x1 = xInverseScale(e[1][0]), 
+			y0 = yInverseScale(e[0][1]), 
+			y1 = yInverseScale(e[1][1]);
+
+		var scatterFilter = {
+			xFilterVar: this.xVar,
+			yFilterVar: this.yVar,
+						
+			// ranges
+			xFilterRange: [
+				Math.min( x0, x1 ),
+				Math.max( x0, x1 )
+			],
+			
+			yFilterRange: [
+				Math.min( y0, y1 ),
+				Math.max( y0, y1 )
+			]
+		};
+		tempo.setScatterFilter(scatterFilter);
+	}
 }
 
 ScatterView.prototype.clearBrush = function()
@@ -453,16 +457,28 @@ ScatterView.prototype.setXVar = function(xVar, dontRender)
 	this.xVar = xVar;
 	this.xVarText.html(xVar);
 	this.xSeries = theData.generateOneSeries(xVar);
-	tempo.renderGL();
 	this.updateLinechart(true);
+	
+	if (!this.brush.empty()) {
+		this.doScatterBrush();	// <-- tempo.renderGL() happens here
+	}
+	else {
+		tempo.renderGL();
+	}
 }
 ScatterView.prototype.setYVar = function(yVar, dontRender)
 {
 	this.yVar = yVar;
 	this.yVarText.html(yVar);
 	this.ySeries = theData.generateOneSeries(yVar);
-	tempo.renderGL();
 	this.updateLinechart(true);
+	
+	if (!this.brush.empty()) {
+		this.doScatterBrush();	// <-- tempo.renderGL() happens here
+	}
+	else {
+		tempo.renderGL();
+	}
 }
 
 
