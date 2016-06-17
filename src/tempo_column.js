@@ -45,7 +45,11 @@ TimeColumn.prototype.addView = function(varName, scatterHeight)
 	var group = this.group.append("g")
 		.attr("transform", "translate(" + 0 + "," + yOffset + ")");
 
-	var scatterView = new ScatterView(this, group, this.columnVariable, varName, this.w, scatterHeight);
+	var scatterView = new ScatterView(this, group, this.columnVariable, varName, this.w, 
+		scatterHeight ? scatterHeight.scatter : undefined,
+		scatterHeight ? scatterHeight.linechart : undefined,
+		scatterHeight ? scatterHeight.linechartVisibility : undefined
+	);
 	this.views.push(scatterView);
 
 	return this.views[ this.views.length-1 ];
@@ -55,7 +59,14 @@ TimeColumn.prototype.getScatterHeights = function()
 {
 	var heights = [];
 	for (var i=0, N=this.views.length; i<N; i++) {
-		heights.push(this.views[i].getH());
+		heights.push(
+		{
+			scatter: this.views[i].getScatterH() ,
+			linechart: this.views[i].getLinechartH(),
+			linechartVisibility: this.views[i].getLinechartVisibility(),
+			total: this.views[i].getH()
+
+		});
 	}
 	return heights;
 }
@@ -64,7 +75,6 @@ TimeColumn.prototype.updateScatterSize = function(instigator, newW, newH)
 {
 	var oldW = this.getW();
 	var yOffset = 0;
-	var scatterHeights = [];
 
 	for (var i=0, N=this.views.length; i<N; i++) 
 	{
@@ -83,10 +93,7 @@ TimeColumn.prototype.updateScatterSize = function(instigator, newW, newH)
 		// set a new offset
 		view.getGroup()
 			.attr("transform", "translate(0," + yOffset + ")");
-	
-		// store view height
-		scatterHeights.push( view.getH() );
-		
+			
 		// keep track of running offset
 		yOffset += view.getH() + SCATTER_SPACING;
 
@@ -96,9 +103,45 @@ TimeColumn.prototype.updateScatterSize = function(instigator, newW, newH)
 		// update the position of the rest the columns
 		this.w = newW;
 	}
+	var scatterHeights = this.getScatterHeights();
+
 
 	if (instigator) {
 		tempo.realignColumns(this, scatterHeights);
+	}
+}
+
+
+TimeColumn.prototype.initiateToggleLinechartView = function(view)
+{
+	// identify the view index
+	var viewIndex = -1;
+	for (var i=0; i<this.views.length; i++) {
+		if (this.views[i] == view) {
+			viewIndex = i;
+			continue;
+		}
+	}
+
+	tempo.toggleLinechartView(viewIndex);
+}
+
+TimeColumn.prototype.toggleLinechartView = function(viewIndex, startCallback, endCallback)
+{
+	var visible = this.views[viewIndex].toggleLinechartView(startCallback, endCallback);
+
+
+	// offset the rest of the columns
+	var yOffset = 0;
+	for (var i=0; i<this.views.length; i++) 
+	{
+		if (i > viewIndex)
+		{
+			this.views[i].getGroup()
+				.transition().duration(EXPAND_DURATION)
+				.attr("transform", "translate(0," + yOffset + ")");
+		}
+		yOffset += this.views[i].getH();
 	}
 }
 

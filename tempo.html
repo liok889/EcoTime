@@ -5,13 +5,15 @@
 
 	<!-- css -->
 	<link href='css/tempo.css' rel='stylesheet' type='text/css'>
-
+	
 	<link href='https://fonts.googleapis.com/css?family=Lato:400,300,700' rel='stylesheet' type='text/css'>
 	<link href='https://fonts.googleapis.com/css?family=Anonymous+Pro:400,700' rel='stylesheet' type='text/css'>
+	
 	<link href="lib/jquery-ui.css" rel="stylesheet" type="text/css">
 
 	<script src="lib/d3.min.js" charset="utf-8"></script>
 	<script src="lib/jquery.min.js"></script>
+	
 	<script src="lib/jquery-ui.js"></script>
 
 	<!-- local libraries -->
@@ -119,15 +121,17 @@
 
 	<!-- visualization space -->
 	<div class="visSpace" width="100%">
-		<svg id="visSVG" width="100%" height="100%"></svg>
+		<svg id="visSVG" width="100%" height="100%"><defs></defs></svg>
 		<canvas id="visCanvas"></canvas>
 		<svg id="interactSVG" width="0" height="0"></svg>
 	</div>
 
 	<!-- scatterplot points shader -->
 	<script id="shader-vs-points" type="x-shader/x-vertex">
+
 		precision mediump float;
-		attribute vec2 aVertexPosition;
+		attribute vec3 aVertexPosition;
+		attribute vec2 aVertexFilter;
 
 		uniform mat4 uMVMatrix;
 		uniform mat4 uPMatrix;
@@ -137,36 +141,198 @@
 		uniform vec2 domainMin;
 		uniform vec2 domainLen;
 		uniform float pointSize;
-		    
+		uniform float pointOpacity;
+		
+		// filter, to be used in brushing and linking
+		uniform int filter;
+		uniform vec2 filterMin;
+		uniform vec2 filterMax;
+
+		// color of point, to pass to fragment shader
+		varying lowp vec4 pointColor;
+
+		// color of points
+		const vec3 COLOR = vec3(0.15);
+		const vec3 HI_COLOR = vec3(0.702*1.1, 0, 0);
+
+		// type of filter
+		const int FILTER_NONE = 0;
+		const int FILTER_SCATTER = 1;
+		const int FILTER_TIME = 2;
+
 		void main(void) 
 		{
-			vec2 p = ((aVertexPosition - domainMin) / domainLen);
+			vec2 p = ((aVertexPosition.xy - domainMin) / domainLen);
 			p.y = 1.0 - p.y;
 			gl_Position = uPMatrix * uMVMatrix * vec4(p * rangeLen + rangeMin, 0.0, 1.0);
 			
 			// the size of the point
 			gl_PointSize = pointSize;
+
+			// see if we are filter
+			if (filter == FILTER_SCATTER) {
+
+				bvec2 exclude = equal(aVertexFilter, vec2(9999.0));
+				if (any(exclude)) {
+					// not within filter
+					pointColor = vec4(COLOR, 1);
+				}
+				else
+				{
+					bvec2 m0 = greaterThanEqual(aVertexFilter, filterMin);
+					bvec2 m1 = lessThanEqual(aVertexFilter, filterMax);
+					
+					if (all(m0) && all(m1)) 
+					{
+						// ** Highlight
+						pointColor = vec4(HI_COLOR, 1.65);
+					}
+					else
+					{
+						// not within filter
+						pointColor = vec4(COLOR, 1);
+					}
+				}
+			}
+			else if (filter == FILTER_TIME)
+			{
+				
+				if (aVertexPosition.z >= filterMin[0] && aVertexPosition.z <= filterMax[0]) 
+				{
+					pointColor = vec4(HI_COLOR, 1.65);
+				}
+				else
+				{
+					pointColor = vec4(COLOR, 1);
+				}
+			}
+			else
+			{
+				// no filter; normal color
+				pointColor = vec4(COLOR, 1);
+			}
 		}
 
 	</script>
 
 	<script id="shader-fs-points" type="x-shader/x-fragment">
 		precision mediump float;
+		varying lowp vec4 pointColor;
 		uniform float pointOpacity;
 		
 		void main() 
 		{
 			float dist = distance( gl_PointCoord, vec2(0.5) );
 			float alpha = 1.0 - smoothstep(0.45,0.5,dist);
-			gl_FragColor = vec4(0, 0, 0, alpha * pointOpacity);
+			gl_FragColor = vec4(pointColor.rgb, pointColor.a * alpha * pointOpacity);
 		}
 	</script>
 
 
+	<!-- scatter plot seleciton shader: we use it to dump the points within the brush
+	to an offline texture -->
+	<script id="shader-vs-brush-dump" type="x-shader/x-vertex">
+		precision mediump float;
+		attribute vec3 aVertexPosition;
+		attribute vec2 aVertexFilter;
+
+		// projection matrix
+		uniform mat4 uPMatrix;
+
+		// width of texture
+		uniform float textureWidth;
+		
+		// filter, to be used in brushing and linking
+		uniform vec2 filterMin;
+		uniform vec2 filterMax;
+
+		void main(void) 
+		{
+			bvec2 exclude = equal(aVertexFilter, vec2(9999.0));
+			vec2 dumpCoord = vec2(-99.0, -99.0);
+			
+			if (!any(exclude)) 
+			{	
+				bvec2 m0 = greaterThanEqual(aVertexFilter, filterMin);
+				bvec2 m1 = lessThanEqual(aVertexFilter, filterMax);
+					
+				if (all(m0) && all(m1)) 
+				{
+					// ** pass
+					float floored = floor(aVertexPosition.z / textureWidth);
+					dumpCoord = vec2(aVertexPosition.z - floored * textureWidth, floored);
+				}
+			}
+			gl_Position = uPMatrix * vec4(dumpCoord+vec2(0.5), 0.0, 1.0);
+			gl_PointSize = 1.0;
+		}
+	</script>
+	<script id="shader-fs-brush-dump" type="x-shader/x-fragment">
+		void main() {
+			gl_FragColor = vec4(0, 0, 0, 1);
+		}
+	</script>
+	
+	<!-- scatter plot seleciton shader: we use it to dump the points within the brush
+	to an offline texture -->
+	<script id="shader-vs-timeline-brush" type="x-shader/x-vertex">
+		precision mediump float;
+		attribute vec3 aVertexPosition;
+		attribute vec2 aVertexFilter;
+
+		// projection matrix
+		uniform mat4 uPMatrix;
+
+		// time range
+		uniform float minTime;
+		uniform float timeLen;
+		uniform vec2 rangeMin;
+		uniform vec2 rangeLen;
+
+		// filter, to be used in brushing and linking
+		uniform vec2 filterMin;
+		uniform vec2 filterMax;
+
+		void main(void) 
+		{
+			bvec2 exclude = equal(aVertexFilter, vec2(9999.0));
+			vec2 timelinePoint = vec2(-999.0, -999.0);
+			
+			if (!any(exclude)) 
+			{	
+				bvec2 m0 = greaterThanEqual(aVertexFilter, filterMin);
+				bvec2 m1 = lessThanEqual(aVertexFilter, filterMax);
+					
+				if (all(m0) && all(m1)) 
+				{
+					// ** pass
+					timelinePoint = rangeMin + rangeLen *
+						vec2( (aVertexPosition.z - minTime) / timeLen, 0.5);
+				}
+			}
+			gl_Position = uPMatrix * vec4(timelinePoint, 0.0, 1.0);
+			gl_PointSize = 4.0;
+		}
+	</script>
+	<script id="shader-fs-timeline-brush" type="x-shader/x-fragment">
+		precision mediump float;
+		const vec3 HI_COLOR = vec3(0.702*1.1, 0, 0);
+
+		void main() 
+		{
+			float dist = distance( gl_PointCoord, vec2(0.5) );
+			float alpha = 1.0 - smoothstep(0.45,0.5,dist);
+			gl_FragColor = vec4(HI_COLOR, alpha * 0.25);
+		}
+	</script>
+
 	<!-- connected scatterplot shader -->
 	<script id="shader-vs-lines" type="x-shader/x-vertex">
-		attribute vec2 aVertexPosition;
+		precision mediump float;
+		attribute vec3 aVertexPosition;
 		attribute vec4 aVertexColor;   
+		attribute vec2 aVertexFilter;
+
 		uniform mat4 uMVMatrix;
 		uniform mat4 uPMatrix;
 		uniform vec2 rangeMin;
@@ -175,13 +341,67 @@
 		uniform vec2 domainLen;
 		uniform bool singleColor;
 
+		// filter, to be used in brushing and linking
+		uniform int filter;
+		uniform vec2 filterMin;
+		uniform vec2 filterMax;
+
 		// color
 		varying lowp vec4 vColor;
-				    
-		void main(void) {
-			vec2 p = ((aVertexPosition - domainMin) / domainLen);
+		varying lowp float inFilter;
+
+		// type of filter
+		const int FILTER_NONE = 0;
+		const int FILTER_SCATTER = 1;
+		const int FILTER_TIME = 2;
+
+		void main(void) 
+		{
+			vec2 p = ((aVertexPosition.xy - domainMin) / domainLen);
 			p.y = 1.0 - p.y;
 			gl_Position = uPMatrix * uMVMatrix * vec4(p * rangeLen + rangeMin, 0.0, 1.0);
+
+			// see if we are filter
+			if (filter == FILTER_SCATTER) {
+
+				bvec2 exclude = equal(aVertexFilter, vec2(9999.0));
+				if (any(exclude)) {
+					// not within filter
+					inFilter = 0.0;
+				}
+				else
+				{
+					bvec2 m0 = greaterThanEqual(aVertexFilter, filterMin);
+					bvec2 m1 = lessThanEqual(aVertexFilter, filterMax);
+					
+					if (all(m0) && all(m1)) 
+					{
+						// ** in Filter
+						inFilter = 1.0;
+					}
+					else
+					{
+						// not within filter
+						inFilter = 0.0;
+					}
+				}
+			}
+			else if (filter == FILTER_TIME)
+			{
+				if (aVertexPosition.z >= filterMin[0] && aVertexPosition.z <= filterMax[0]) {
+					inFilter = 1.0;
+				}
+				else
+				{
+					inFilter = 0.0;
+				}
+			}
+			else
+			{
+				// no filter
+				inFilter = 1.0;
+			}
+
 			if (singleColor) {
 				vColor = vec4(1.0, 0.678, 0.2, 0.85);
 			}
@@ -193,13 +413,14 @@
 	</script>
 
 	<script id="shader-fs-lines" type="x-shader/x-fragment">
+		precision mediump float;
 		varying lowp vec4 vColor;
+		varying lowp float inFilter;
+		const float MAX_LINE_OPACITY = 1.0;
+
 		void main(void) {
-			gl_FragColor = vColor;
+			gl_FragColor = vec4(vColor.rgb, MAX_LINE_OPACITY * vColor.a * smoothstep(0.5, 0.9, inFilter));
 		}
-	</script>
-
-
 	</script>
 
 
@@ -231,7 +452,7 @@
 			// maximize div.visSpace
 			var visSpace = d3.select('div.visSpace');
 			var visSpaceBounds = visSpace.node().getBoundingClientRect();
-			//visSpace.style("height", (window.innerHeight-visSpaceBounds.top-10) + 'px');
+			visSpace.style("height", (window.innerHeight-visSpaceBounds.top-10) + 'px');
 
 			var visSVG = document.getElementById('visSVG');
 			var bounding = visSVG.getBoundingClientRect();

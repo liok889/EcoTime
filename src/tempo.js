@@ -17,12 +17,12 @@ var COLUMN_Y = 100;
 var COLUMN_SPACING = 0;
 
 // default column variable
-var DEF_COLUMN_VARIABLE = 'fc';
-var DEF_SLIDER_LENGTH = 75;
+var DEF_COLUMN_VARIABLE = 'GPP_WithUstar_f';
+var DEF_SLIDER_LENGTH = 110;
 var DEF_SLIDER_MIN_LENGTH = 15;
 
 // list of interesting variables to choose from
-var INTERESTING_VARS = ['PRIsn', 'LE', 'Tair', 'VPD'];
+var INTERESTING_VARS = ['Ustar', 'LE', 'Tair', 'VPD', 'hour'];
 var ADD_ALL_INTERESTING = true;
 var SLIDER_OPACITY = 0.8;
 
@@ -37,6 +37,13 @@ var POINT_SIZE = 10.0;
 
 // width of lines
 var LINE_WIDTH = 2.0;
+
+// type of filter to use
+var FILTER_NONE = 0;
+var FILTER_SCATTER = 1;
+var FILTER_TIME = 2;
+
+var TIMELINE_BRUSH_THICKNESS = 4;
 
 function Tempo()
 {
@@ -300,6 +307,46 @@ Tempo.prototype.addColumn = function()
 	this.renderGL();
 }
 
+Tempo.prototype.toggleLinechartView = function(viewIndex)
+{
+	for (var i=0; i<this.columns.length; i++) {
+		this.columns[i].column.toggleLinechartView(
+			viewIndex,
+
+			// pass glStartAnimation, glEndAnimation for first column only
+			i == 0 ? glStartAnimation : undefined,
+			i == 0 ? glEndAnimation: undefined
+		);
+	}
+}
+
+var glAnimation = null;
+function glStartAnimation()
+{
+	if (glAnimation === null) 
+	{
+		glAnimation = requestAnimationFrame(function() 
+		{
+			glAnimation = null;
+			tempo.renderGL();
+
+			// schedule another animation
+			glStartAnimation();
+		});
+	}
+}
+
+function glEndAnimation()
+{
+	if (glAnimation !== null) {
+		cancelAnimationFrame(glAnimation);
+		glAnimation = null;
+
+		// one more render
+		tempo.renderGL();
+	}
+}
+
 Tempo.prototype.removeColumn = function()
 {
 	if (this.columns.length > 0) 
@@ -392,6 +439,55 @@ Tempo.prototype.realignColumns = function(instigator, scatterHeights)
 	this.renderGL();
 	
 }
+
+Tempo.prototype.setScatterFilter = function(filter)
+{
+	this.scatterFilter = filter;
+	var views = this.getAllViews();
+	
+	for (var i=0, N=views.length; i<N; i++) {
+		views[i].setBrushedTimePoints(filter ? undefined : null);
+	}
+	
+	this.renderGL();
+}
+
+Tempo.prototype.setTimeFilter = function(filter)
+{
+	this.timeFilter = filter;
+	this.renderGL();
+}
+
+Tempo.prototype.getAllViews = function() {
+	var views = [];
+	for (var i=0, N=this.columns.length; i<N; i++) {
+		var cViews = this.columns[i].column.getViews();
+		for (var j=0, M=cViews.length; j<M; j++) {
+			views.push( cViews[j] );
+		}
+	}
+	return views;
+}
+
+Tempo.prototype.startBrush = function(instigator)
+{
+	this.scatterFilter = undefined;
+	this.timeFilter = undefined;
+
+	for (var i=0, N=this.columns.length; i<N; i++) 
+	{
+		var column = this.columns[i].column;
+		var views = column.getViews();
+		for (var j=0, M=views.length; j<M; j++) 
+		{
+			if (views[j] != instigator) 
+			{
+				views[j].clearBrushes();
+			}
+		}
+	}
+}
+
 Tempo.prototype.renderGL = function()
 {
 	// initialize the shader
@@ -418,26 +514,54 @@ Tempo.prototype.renderGL = function()
 	gl.lineWidth(LINE_WIDTH);
 
 	// initialize shader
-	if (!this.linesShader) 
-	{
-		this.linesShader = new Shader(gl,
-			getShader(gl, 'shader-vs-lines'),
-			getShader(gl, 'shader-fs-lines'), 
-			['aVertexPosition', 'aVertexColor'],
-			['singleColor', 'uPMatrix', 'uMVMatrix', 'rangeMin', 'rangeLen', 'domainMin', 'domainLen']
-		);
-	}
-
 	if (!this.pointsShader) 
 	{
 		this.pointsShader = new Shader(gl,
 			getShader(gl, 'shader-vs-points'),
 			getShader(gl, 'shader-fs-points'), 
-			['aVertexPosition'],
+			['aVertexPosition', 'aVertexFilter'],
 			[	'pointOpacity', 'pointSize',
-				'uPMatrix', 'uMVMatrix', 'rangeMin', 'rangeLen', 'domainMin', 'domainLen'
-			]
-		);
+				'uPMatrix', 'uMVMatrix', 'rangeMin', 'rangeLen', 'domainMin', 'domainLen',
+				'filter', 'filterMin', 'filterMax'
+			]);
+	}
+
+	if (!this.linesShader) 
+	{
+		this.linesShader = new Shader(gl,
+			getShader(gl, 'shader-vs-lines'),
+			getShader(gl, 'shader-fs-lines'), 
+			['aVertexPosition', 'aVertexColor', 'aVertexFilter'],
+			[
+				'singleColor', 'uPMatrix', 'uMVMatrix', 'rangeMin', 'rangeLen', 'domainMin', 'domainLen',
+				'filter', 'filterMin', 'filterMax'
+			]);
+	}
+
+	if (!this.scatterDumpShader)
+	{
+		this.scatterDumpShader = new Shader(gl,
+			getShader(gl, 'shader-vs-brush-dump'),
+			getShader(gl, 'shader-fs-brush-dump'),
+			['aVertexPosition', 'aVertexFilter'],
+			[
+				'uPMatrix', 'textureWidth',
+				'filterMin', 'filterMax',
+				'rangeMin', 'rangeLen'
+			]);
+	}
+
+	if (!this.timelineBrushShader)
+	{
+		this.timelineBrushShader = new Shader(gl,
+			getShader(gl, 'shader-vs-timeline-brush'),
+			getShader(gl, 'shader-fs-timeline-brush'),
+			['aVertexPosition', 'aVertexFilter'],
+			[
+				'uPMatrix', 'minTime', 'timeLen',
+				'filterMin', 'filterMax',
+				'rangeMin', 'rangeLen'
+			]);		
 	}
 
 	// clear
@@ -485,7 +609,10 @@ Tempo.prototype.renderGL = function()
 		{
 			var view = views[j];
 
-			rangeLen[1] = view.getH() - SCATTER_PAD*2
+			// set time range for this view
+			view.setTimeRange( timeRange );
+
+			rangeLen[1] = view.getScatterH() - SCATTER_PAD*2
 
 			var xDomain = view.getXDomain();
 			var yDomain = view.getYDomain();
@@ -496,8 +623,46 @@ Tempo.prototype.renderGL = function()
 				yDomain[1] - yDomain[0]
 			];
 
+			// get framebuffer
+			/*
+			if (!view.framebuffer) {
+				var w = 256;
+				var h = Math.ceil(theData.getTimeLength() / w);
+				view.framebuffer = new FrameBuffer(gl, [w, h]);
+			}
+			*/
+
 			// render
-			var glData = getGLData(gl, view.getXVar(), view.getYVar());
+			var glData = getPairedTimeseries(view.getXVar(), view.getYVar());
+			var filterBuffer = null;
+
+			// see if we have a filter set
+			var filterType = FILTER_NONE;
+			if (this.scatterFilter)
+			{
+				filterType = FILTER_SCATTER;
+				var xFilterVar = this.scatterFilter.xFilterVar;
+				var yFilterVar = this.scatterFilter.yFilterVar;
+
+				// see if we have a cached filter for this paired series and filter pair
+				if (!glData.filters) glData.filters = d3.map();
+				var filterKey = xFilterVar + "_$$_" + yFilterVar;
+				filterBuffer = glData.filters.get(filterKey);
+
+				if (!filterBuffer) 
+				{
+					// construct a filter for this pair
+					filterBuffer = getPairedFilter(view.getXVar(), view.getYVar(), xFilterVar, yFilterVar);
+
+					// store it
+					glData.filters.set(filterKey, filterBuffer);
+				}
+			}
+			else if (this.timeFilter)
+			{
+				filterType = FILTER_TIME;
+			}
+
 
 			// determine draw range
 			var i0 = glData.indices[ timeRange[0] ];
@@ -512,7 +677,9 @@ Tempo.prototype.renderGL = function()
 					// update the uniform
 					if (SHOW_SCATTER_POINTS)
 					{
-						gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+						//gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+						gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+
 						gl.enable(gl.BLEND);
 
 						ps.useShader();
@@ -523,29 +690,175 @@ Tempo.prototype.renderGL = function()
 						gl.uniform1f(ps.uniform('pointSize'), POINT_SIZE);
 						gl.uniform1f(ps.uniform('pointOpacity'), POINT_OPACITY);
 						
-						ps.attrib2buffer('aVertexPosition', glData.vertexBuffer, 2);
+						// only apply point filter (i.e., brushing) if we're not showing lines
+						// otherwise the color of the brushed points intefers with line perception
+						var pointFilter = SHOW_SCATTER_LINES ? FILTER_NONE : filterType;
+						gl.uniform1i(ps.uniform('filter'), pointFilter);
+						
+						if (pointFilter == FILTER_SCATTER) 
+						{
+							var xFilterRange = this.scatterFilter.xFilterRange;
+							var yFilterRange = this.scatterFilter.yFilterRange;
+							var filterMin = [xFilterRange[0], yFilterRange[0]];
+							var filterMax = [xFilterRange[1], yFilterRange[1]];
+
+							gl.uniform2fv(ps.uniform('filterMin'), new Float32Array(filterMin));
+							gl.uniform2fv(ps.uniform('filterMax'), new Float32Array(filterMax));
+						}
+						else if (pointFilter == FILTER_TIME)
+						{
+							var filterMin = [this.timeFilter.timeWindow[0], 0.0];
+							var filterMax = [this.timeFilter.timeWindow[1], 0.0];
+							gl.uniform2fv(ps.uniform('filterMin'), new Float32Array(filterMin));
+							gl.uniform2fv(ps.uniform('filterMax'), new Float32Array(filterMax));
+						}
+						
+						ps.attrib2buffer('aVertexPosition', glData.vertexBuffer, 3);
+						ps.attrib2buffer('aVertexFilter', filterBuffer !== null ? filterBuffer : glData.vertexBuffer, 2);
+
+						// draw
 						gl.drawArrays(gl.POINTS, i0, drawLen);
 
 						ps.unuseShader();
 						gl.disable(gl.BLEND);
 					}
+					
+
+					if (filterType == FILTER_SCATTER && view.isLinechartVisible())
+					{
+						// render points below the linechart to
+						// indicate the brushed time points
+						// ======================================
+						gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+						gl.enable(gl.BLEND);
+
+						var tl = this.timelineBrushShader;
+						var xFilterRange = this.scatterFilter.xFilterRange;
+						var yFilterRange = this.scatterFilter.yFilterRange;
+						var filterMin = [xFilterRange[0], yFilterRange[0]];
+						var filterMax = [xFilterRange[1], yFilterRange[1]];
+
+						tl.useShader();
+						gl.uniform2fv(tl.uniform('filterMin'), new Float32Array(filterMin));
+						gl.uniform2fv(tl.uniform('filterMax'), new Float32Array(filterMax));
+							
+						tl.attrib2buffer('aVertexPosition', glData.vertexBuffer, 3);
+						tl.attrib2buffer('aVertexFilter', filterBuffer !== null ? filterBuffer : glData.vertexBuffer, 2);
+
+						gl.uniformMatrix4fv(tl.uniform('uPMatrix'), false, new Float32Array(projectionMatrix.flatten()));
+						gl.uniform1f(tl.uniform('minTime'), timeRange[0]);
+						gl.uniform1f(tl.uniform('timeLen'), timeRange[1]-timeRange[0]);
+
+						var tRangeMin = [
+							rangeMin[0] - SCATTER_PAD + LINECHART_PAD_W,
+							rangeMin[1] - SCATTER_PAD + view.getH() - TIMELINE_BRUSH_THICKNESS
+						];
+
+						var tRangeLen = [
+							view.getW() - LINECHART_PAD_W*2,
+							TIMELINE_BRUSH_THICKNESS
+						];
+						gl.uniform2fv(tl.uniform('rangeMin'), new Float32Array(tRangeMin));
+						gl.uniform2fv(tl.uniform('rangeLen'), new Float32Array(tRangeLen));
+						
+						// draw
+						gl.drawArrays(gl.POINTS, i0, drawLen);
+
+						// return state
+						gl.disable(gl.BLEND);
+						tl.unuseShader();
+
+						/*
+						if (view.framebuffer && view.getBrushedTimePoints() === undefined)
+						{
+							// dump selected points onto texture
+							// ==================================
+							var ds = this.scatterDumpShader;
+
+							ds.useShader();
+							gl.uniform2fv(ds.uniform('filterMin'), new Float32Array(filterMin));
+							gl.uniform2fv(ds.uniform('filterMax'), new Float32Array(filterMax));
+							
+							ds.attrib2buffer('aVertexPosition', glData.vertexBuffer, 3);
+							ds.attrib2buffer('aVertexFilter', filterBuffer !== null ? filterBuffer : glData.vertexBuffer, 2);
+
+							var pMatrix = makeOrtho(0, view.framebuffer.getW(), 0, view.framebuffer.getH(), -1.0, 1.0)
+							gl.uniformMatrix4fv(ds.uniform('uPMatrix'), false, new Float32Array(pMatrix.flatten()));
+							gl.uniform1f(ds.uniform('textureWidth'), view.framebuffer.getW());
+
+							// draw
+							view.framebuffer.bind();
+
+							// set view port to framebuffer size
+							gl.viewport(0, 0, view.framebuffer.getW(), view.framebuffer.getH());
+							
+							gl.clearColor(1, 1, 1, 1);
+							gl.clear(gl.COLOR_BUFFER_BIT);
+							gl.drawArrays(gl.POINTS, i0, drawLen);
+							gl.clearColor(0, 0, 0, 0);
+
+							view.framebuffer.unbind();
+							ds.unuseShader();
+
+							// return view port to canvas size
+							gl.viewport(0, 0, canvasSize.w, canvasSize.h);
+
+							// get buffer contents
+							var brushedTimePoints = [];
+							var pixels = view.framebuffer.readBufferContents();
+							if (pixels)
+							{
+								// process the pixels
+								for (var k=0, p=0, K=theData.getTimeLength(); k<K; k++, p += 3) 
+								{
+									if (pixels[p] == 0) {
+										brushedTimePoints.push(k);
+									}
+								}
+								view.setBrushedTimePoints(brushedTimePoints);
+							}
+						}
+						*/
+					}
 				
 					if (SHOW_SCATTER_LINES)
 					{
 						gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+						//gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
 						gl.enable(gl.BLEND);
-
 
 						// update the uniform
 						ls.useShader();
-						ls.attrib2buffer('aVertexPosition', glData.vertexBuffer, 2);
-						ls.attrib2buffer('aVertexColor', glData.colorBuffer, 4);
+						gl.uniform1i(ls.uniform('filter'), filterType);
+						
+						if (filterType == FILTER_SCATTER) 
+						{
+							var xFilterRange = this.scatterFilter.xFilterRange;
+							var yFilterRange = this.scatterFilter.yFilterRange;
+							var filterMin = [xFilterRange[0], yFilterRange[0]];
+							var filterMax = [xFilterRange[1], yFilterRange[1]];
+
+							gl.uniform2fv(ls.uniform('filterMin'), new Float32Array(filterMin));
+							gl.uniform2fv(ls.uniform('filterMax'), new Float32Array(filterMax));
+						}
+						else if (filterType == FILTER_TIME)
+						{
+							var filterMin = [this.timeFilter.timeWindow[0], 0.0];
+							var filterMax = [this.timeFilter.timeWindow[1], 0.0];
+							gl.uniform2fv(ls.uniform('filterMin'), new Float32Array(filterMin));
+							gl.uniform2fv(ls.uniform('filterMax'), new Float32Array(filterMax));
+						}
 
 						gl.uniform2fv(ls.uniform('rangeMin'), new Float32Array(rangeMin));
 						gl.uniform2fv(ls.uniform('rangeLen'), new Float32Array(rangeLen));
 						gl.uniform2fv(ls.uniform('domainMin'), new Float32Array(domainMin));
 						gl.uniform2fv(ls.uniform('domainLen'), new Float32Array(domainLen));
 						
+						ls.attrib2buffer('aVertexPosition', glData.vertexBuffer, 3);
+						ls.attrib2buffer('aVertexColor', glData.colorBuffer, 4);
+						ls.attrib2buffer('aVertexFilter', filterBuffer !== null ? filterBuffer : glData.vertexBuffer, 2);
+						
+						// draw
 						gl.uniform1i(ls.uniform('singleColor'), 1);
 						gl.drawArrays(gl.LINE_STRIP, i0, drawLen);
 
@@ -554,13 +867,12 @@ Tempo.prototype.renderGL = function()
 
 						ls.unuseShader();
 						gl.disable(gl.BLEND);
-
 					}
 				}
 			}
 
 			// offset Y to the next scatter plot
-			rangeMin[1] += view.getH() + SCATTER_SPACING;
+			rangeMin[1] += view.getCurrentH() + SCATTER_SPACING;
 		}
 
 		// run the offset
@@ -568,35 +880,9 @@ Tempo.prototype.renderGL = function()
 	}
 }
 
+
 function timeRangeFromNormalized(nRange)
 {
 	var N = theData.getTimeLength();		
 	return [ Math.floor(nRange[0] * (N-1)+0.5), Math.min(N-1,Math.floor(nRange[1] * (N-1)+0.5)) ];
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

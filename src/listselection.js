@@ -12,21 +12,168 @@ function ListSelection(x, y, width, height, selections)
 		return;
 	}
 
+	// store selections
+	this.selections = selections;
+
 	// create a new div element
 	this.div = d3.select("body").append("div")
 		.attr("class", "listSelectionDiv")
 		.style("width", (width || DEFAULT_SELECTION_LIST_W) + "px")
-		.style("height", (height || DEFUALT_SELECTION_LIST_H) + "px")
+		//.style("height", (height || DEFUALT_SELECTION_LIST_H) + "px")
 		.style("left", x + "px")
 		.style("top", y + "px");
 
+	
+	this.input = this.div.append("input")
+		.attr("class", "listSelectionInput")
+		.attr("type", "text")
+		.style("margin-bottom", "5px")
+		.style("width", ((width || DEFAULT_SELECTION_LIST_W)-10) + "px");
+
+	this.contentDiv = this.div.append("div")
+		.style("overflow-y", "scroll")
+		.style("padding", "0px 0px")
+		.style("height", (height || DEFUALT_SELECTION_LIST_H) + "px")
+
+	this.populateList(selections);
+
 	// populate list with span items
-	(function(thisSelector) {
-		
-		thisSelector.text = thisSelector.div.selectAll("span.listSelection").data(selections)
-			.enter().append("span")
-			.attr("class", "listSelection")
-			.html(function(d) { return d + "<br>"})
+	(function(thisSelector) 
+	{
+		// on textbox change, search the seleciton list
+		thisSelector.input
+			.on("keydown", function() {
+				var keyCode = d3.event.keyCode;
+				switch (keyCode)
+				{
+				case 38:
+					// UP
+					if (thisSelector.hoveredItem === null || thisSelector.hoveredItem === undefined) 
+					{
+						thisSelector.hoveredItem = 0;
+						thisSelector.hoverIndex(thisSelector.hoveredItem);
+					}
+					else
+					{
+						if (thisSelector.hoveredItem > 0) {
+							thisSelector.hoveredItem--;
+							thisSelector.hoverIndex(thisSelector.hoveredItem);
+						}
+					}
+					break;
+				case 40:
+					// down key
+					if (thisSelector.hoveredItem === null || thisSelector.hoveredItem === undefined) 
+					{
+						thisSelector.hoveredItem = 0;
+						thisSelector.hoverIndex(thisSelector.hoveredItem);
+					}
+					else
+					{
+						if (thisSelector.hoveredItem < thisSelector.theList.data().length-1 ) {
+							thisSelector.hoveredItem++;
+							thisSelector.hoverIndex(thisSelector.hoveredItem);
+						}
+					}
+					break;
+				case 13:
+					// enter
+					if (thisSelector.hoveredItem !== null && thisSelector.hoveredItem !== undefined)
+					{
+						var entries = thisSelector.theList.data();
+						var item = entries[thisSelector.hoveredItem];
+						thisSelector.clickCallback(item);
+						thisSelector.close();
+					}
+					break;
+				}
+			})
+			.on("keyup", function() 
+			{
+				var searchStr = this.value; searchStr = searchStr.toLowerCase();
+				var matches = searchStr.length == 0 ? thisSelector.selections : [];
+
+				switch (d3.event.keyCode)
+				{
+
+				case 38:
+				case 40:
+				case 13:
+					break;
+				default:
+					if (thisSelector.lastSearch != searchStr)
+					{
+						if (searchStr.length > 0) 
+						{
+							for (var i=0; i < thisSelector.selections.length; i++) 
+							{
+								var entry = thisSelector.selections[i].toLowerCase();
+								if (entry.indexOf(searchStr) != -1) 
+								{
+									matches.push(thisSelector.selections[i]);
+								}
+							}
+						}
+						thisSelector.populateList(matches);
+						thisSelector.hoveredItem = null;
+						thisSelector.lastSearch = searchStr;
+					}
+				}
+			});
+
+		// make a body.click event to close the selection when user clicks anywhere outside
+		setTimeout(function() {
+			d3.select(document.body).on("click.closeListSelection", function() 
+			{
+				if (document.activeElement != thisSelector.input.node()) {
+					thisSelector.close();
+					d3.select(document.body).on("click.closeListSelection", null);
+				}
+			});
+		}, 100);
+
+		// set the textbox to be active
+		thisSelector.input.node().focus();
+	})(this);
+
+	// see which corner to anchor the list at, depending
+	// on how much space we have available in the window
+	var winW = window.innerWidth; var winH = window.innerHeight;
+	var bounds = this.div.node().getBoundingClientRect();
+	var divW = bounds.right-bounds.left, divH = bounds.bottom-bounds.top;
+	if (x + divW > winW) { x -= divW; this.div.style("left", (x+2) + "px"); }
+	if (y + divH > winH) { y -= divH; this.div.style("top",  (y+2) + "px"); }
+}
+
+ListSelection.prototype.hoverIndex = function(index)
+{
+	if (index !== undefined && index !== null)
+	{	
+		(function(thisSelector, index) {
+			thisSelector.theList
+				.style("background-color", function(d, i) {
+					return i==index ? SELECTION_HOVER_COLOR : ''
+				});
+			if (thisSelector.hoverCallback) {
+				thisSelector.hoverCallback(thisSelector.theList.data()[index]);
+			}
+		})(this, index);
+	}
+	else
+	{
+		this.theList.style("background-color", "");
+	}
+}
+
+ListSelection.prototype.populateList = function(entries)
+{
+	(function(thisSelector, entries) 
+	{
+		// update the list of data
+		var update = thisSelector.contentDiv.selectAll("span.listSelection").data(entries);
+		var enter = update.enter();
+		enter.append('span')
+			.attr('class', 'listSelection')
 			.on("mouseover", function() {
 				if (thisSelector.hoverCallback) {
 					thisSelector.hoverCallback(d);
@@ -37,24 +184,22 @@ function ListSelection(x, y, width, height, selections)
 				if (thisSelector.hoverCallback) {
 					thisSelector.hoverCallback();
 				}
-				d3.select(this).style("background-color", "");
+				thisSelector.hoverIndex(null);
 			})
 			.on("click", function(d) {
 				if (thisSelector.clickCallback) {
 					thisSelector.clickCallback(d)
 				}
 				thisSelector.close();
-			})
-
-		// make a body.click event to close the selection when user clicks anywhere outside
-		setTimeout(function() {
-			d3.select(document.body).on("click.closeListSelection", function() 
-			{
-				thisSelector.close();
-				d3.select(document.body).on("click.closeListSelection", null);
 			});
-		}, 100);
-	})(this);
+
+		update
+			.html(function(d) { return d + "<br>"; });
+
+		update.exit().remove();
+
+		thisSelector.theList = update;
+	})(this, entries);
 }
 
 ListSelection.prototype.close = function()

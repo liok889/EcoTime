@@ -2,9 +2,12 @@
  * A multidimensional timeseries
  * =================================*/
  
-function Timeseries()
+function Timeseries(N)
 {
 	this.series = [];
+	if (N !== undefined && N !== null && !isNaN(N)) {
+		this.series.length = N;
+	}
 }
 
 Timeseries.prototype.size = function()
