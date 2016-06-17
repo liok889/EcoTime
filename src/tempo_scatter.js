@@ -525,7 +525,7 @@ ScatterView.prototype.updateSize = function(w, h)
 					
 		var xNewScale = d3.scale.linear()
 			.domain([this.timeRange[0], this.timeRange[1]])
-			.range(this.timeRange);
+			.range([0, this.w - LINECHART_PAD_W*2]);
 
 		var e = this.linechartBrush.extent();
 		var 
@@ -681,6 +681,9 @@ ScatterView.prototype.updateLinechart = function(forceUpdate)
 		
 
 		this.linechartTimeRange = [ this.timeRange[0], this.timeRange[1] ];	
+		if (!this.linechartBrush.empty()) {
+			this.doLinechartBrush();
+		}
 	}
 
 	// update the transform
