@@ -362,6 +362,11 @@ ScatterView.prototype.getLinechartVisibility = function()
 	return this.linechartVisibility;
 }
 
+ScatterView.prototype.isLinechartVisible = function()
+{
+	return this.linechartContent.style("visibility") == "visible";
+}
+
 ScatterView.prototype.toggleLinechartView = function(startCallback, endCallback)
 {
 	return (function(scatterview, start, end)
@@ -569,6 +574,13 @@ ScatterView.prototype.setYVar = function(yVar, dontRender)
 	}
 }
 
+ScatterView.prototype.setBrushedTimePoints = function(list)
+{
+	this.brushedTimePoints = list;
+}
+ScatterView.prototype.getBrushedTimePoints = function() {
+	return this.brushedTimePoints;
+}
 
 ScatterView.prototype.getXVar = function()
 {
@@ -686,7 +698,6 @@ ScatterView.prototype.updateLinechart = function(forceUpdate)
 	this.linechartContent.select("g.linechartData")
 		.attr("transform", transform);
 }
-
 
 // GL render
 // ==============

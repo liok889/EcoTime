@@ -292,3 +292,79 @@ Shader.prototype.attrib2buffer = function(attribName, vertexBuffer, size)
 	this.gl.vertexAttribPointer(this.attribMap[attribName], size, gl.FLOAT, false, 0, 0);
 }
 
+// FrameBuffer
+// ===========
+function FrameBuffer(gl, bufferSize)
+{
+	this.gl = gl;
+	this.fb = gl.createFramebuffer();
+	gl.bindFramebuffer(gl.FRAMEBUFFER, this.fb);
+	this.fb.width = bufferSize[0];
+	this.fb.height = bufferSize[1];
+
+	// texture
+	this.texture = gl.createTexture();
+	gl.bindTexture(gl.TEXTURE_2D, this.texture);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+	gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, this.fb.width, this.fb.height, 0, gl.RGB, gl.UNSIGNED_BYTE, null);
+
+	// render buffer
+	this.renderbuffer = gl.createRenderbuffer();
+	gl.bindRenderbuffer(gl.RENDERBUFFER, this.renderbuffer);
+	gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, this.fb.width, this.fb.height);
+
+	gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.texture, 0);
+	gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, this.renderbuffer);
+
+
+	// unbind
+	gl.bindTexture(gl.TEXTURE_2D, null);
+	gl.bindRenderbuffer(gl.RENDERBUFFER, null);
+	gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+}
+
+FrameBuffer.prototype.bind = function()
+{
+	this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.fb);
+}
+FrameBuffer.prototype.unbind = function()
+{
+	this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
+}
+FrameBuffer.prototype.getW = function() {
+	return this.fb.width;
+}
+FrameBuffer.prototype.getH = function() {
+	return this.fb.height;
+}
+FrameBuffer.prototype.readBufferContents = function()
+{
+	this.bind();
+	var gl = this.gl;
+	var canRead = (gl.checkFramebufferStatus(gl.FRAMEBUFFER) == gl.FRAMEBUFFER_COMPLETE);
+	if (canRead) 
+	{
+		if (!this.pixels) {
+			this.pixels = new Uint8Array(this.getW() * this.getH() * 3);
+		}
+
+		// bind the framebuffer
+		this.bind();
+
+		// read the pixels
+		gl.readPixels(0, 0, this.getW(), this.getH(), gl.RGB, gl.UNSIGNED_BYTE, this.pixels)
+
+		// Unbind the framebuffer
+		this.unbind();
+	}
+
+	this.unbind();
+	if (canRead) {
+		return this.pixels
+	}
+	else
+	{
+		return null;
+	}
+}

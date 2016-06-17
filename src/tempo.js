@@ -43,6 +43,8 @@ var FILTER_NONE = 0;
 var FILTER_SCATTER = 1;
 var FILTER_TIME = 2;
 
+var TIMELINE_BRUSH_THICKNESS = 4;
+
 function Tempo()
 {
 	this.vis = d3.select("#visSVG");
@@ -441,6 +443,12 @@ Tempo.prototype.realignColumns = function(instigator, scatterHeights)
 Tempo.prototype.setScatterFilter = function(filter)
 {
 	this.scatterFilter = filter;
+	var views = this.getAllViews();
+	
+	for (var i=0, N=views.length; i<N; i++) {
+		views[i].setBrushedTimePoints(filter ? undefined : null);
+	}
+	
 	this.renderGL();
 }
 
@@ -448,6 +456,17 @@ Tempo.prototype.setTimeFilter = function(filter)
 {
 	this.timeFilter = filter;
 	this.renderGL();
+}
+
+Tempo.prototype.getAllViews = function() {
+	var views = [];
+	for (var i=0, N=this.columns.length; i<N; i++) {
+		var cViews = this.columns[i].column.getViews();
+		for (var j=0, M=cViews.length; j<M; j++) {
+			views.push( cViews[j] );
+		}
+	}
+	return views;
 }
 
 Tempo.prototype.startBrush = function(instigator)
@@ -468,9 +487,9 @@ Tempo.prototype.startBrush = function(instigator)
 		}
 	}
 }
+
 Tempo.prototype.renderGL = function()
 {
-
 	// initialize the shader
 	// =====================
 	var canvasSize = this.getSVGSize();
@@ -504,8 +523,7 @@ Tempo.prototype.renderGL = function()
 			[	'pointOpacity', 'pointSize',
 				'uPMatrix', 'uMVMatrix', 'rangeMin', 'rangeLen', 'domainMin', 'domainLen',
 				'filter', 'filterMin', 'filterMax'
-			]
-		);
+			]);
 	}
 
 	if (!this.linesShader) 
@@ -517,10 +535,34 @@ Tempo.prototype.renderGL = function()
 			[
 				'singleColor', 'uPMatrix', 'uMVMatrix', 'rangeMin', 'rangeLen', 'domainMin', 'domainLen',
 				'filter', 'filterMin', 'filterMax'
-			]
-		);
+			]);
 	}
 
+	if (!this.scatterDumpShader)
+	{
+		this.scatterDumpShader = new Shader(gl,
+			getShader(gl, 'shader-vs-brush-dump'),
+			getShader(gl, 'shader-fs-brush-dump'),
+			['aVertexPosition', 'aVertexFilter'],
+			[
+				'uPMatrix', 'textureWidth',
+				'filterMin', 'filterMax',
+				'rangeMin', 'rangeLen'
+			]);
+	}
+
+	if (!this.timelineBrushShader)
+	{
+		this.timelineBrushShader = new Shader(gl,
+			getShader(gl, 'shader-vs-timeline-brush'),
+			getShader(gl, 'shader-fs-timeline-brush'),
+			['aVertexPosition', 'aVertexFilter'],
+			[
+				'uPMatrix', 'minTime', 'timeLen',
+				'filterMin', 'filterMax',
+				'rangeMin', 'rangeLen'
+			]);		
+	}
 
 	// clear
 	gl.clear(gl.COLOR_BUFFER_BIT);
@@ -580,6 +622,15 @@ Tempo.prototype.renderGL = function()
 				xDomain[1] - xDomain[0], 
 				yDomain[1] - yDomain[0]
 			];
+
+			// get framebuffer
+			/*
+			if (!view.framebuffer) {
+				var w = 256;
+				var h = Math.ceil(theData.getTimeLength() / w);
+				view.framebuffer = new FrameBuffer(gl, [w, h]);
+			}
+			*/
 
 			// render
 			var glData = getPairedTimeseries(view.getXVar(), view.getYVar());
@@ -665,10 +716,109 @@ Tempo.prototype.renderGL = function()
 						ps.attrib2buffer('aVertexPosition', glData.vertexBuffer, 3);
 						ps.attrib2buffer('aVertexFilter', filterBuffer !== null ? filterBuffer : glData.vertexBuffer, 2);
 
+						// draw
 						gl.drawArrays(gl.POINTS, i0, drawLen);
 
 						ps.unuseShader();
 						gl.disable(gl.BLEND);
+					}
+					
+
+					if (filterType == FILTER_SCATTER && view.isLinechartVisible())
+					{
+						// render points below the linechart to
+						// indicate the brushed time points
+						// ======================================
+						gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+						gl.enable(gl.BLEND);
+
+						var tl = this.timelineBrushShader;
+						var xFilterRange = this.scatterFilter.xFilterRange;
+						var yFilterRange = this.scatterFilter.yFilterRange;
+						var filterMin = [xFilterRange[0], yFilterRange[0]];
+						var filterMax = [xFilterRange[1], yFilterRange[1]];
+
+						tl.useShader();
+						gl.uniform2fv(tl.uniform('filterMin'), new Float32Array(filterMin));
+						gl.uniform2fv(tl.uniform('filterMax'), new Float32Array(filterMax));
+							
+						tl.attrib2buffer('aVertexPosition', glData.vertexBuffer, 3);
+						tl.attrib2buffer('aVertexFilter', filterBuffer !== null ? filterBuffer : glData.vertexBuffer, 2);
+
+						gl.uniformMatrix4fv(tl.uniform('uPMatrix'), false, new Float32Array(projectionMatrix.flatten()));
+						gl.uniform1f(tl.uniform('minTime'), timeRange[0]);
+						gl.uniform1f(tl.uniform('timeLen'), timeRange[1]-timeRange[0]);
+
+						var tRangeMin = [
+							rangeMin[0] - SCATTER_PAD + LINECHART_PAD_W,
+							rangeMin[1] - SCATTER_PAD + view.getH() - TIMELINE_BRUSH_THICKNESS
+						];
+
+						var tRangeLen = [
+							view.getW() - LINECHART_PAD_W*2,
+							TIMELINE_BRUSH_THICKNESS
+						];
+						gl.uniform2fv(tl.uniform('rangeMin'), new Float32Array(tRangeMin));
+						gl.uniform2fv(tl.uniform('rangeLen'), new Float32Array(tRangeLen));
+						
+						// draw
+						gl.drawArrays(gl.POINTS, i0, drawLen);
+
+						// return state
+						gl.disable(gl.BLEND);
+						tl.unuseShader();
+
+						/*
+						if (view.framebuffer && view.getBrushedTimePoints() === undefined)
+						{
+							// dump selected points onto texture
+							// ==================================
+							var ds = this.scatterDumpShader;
+
+							ds.useShader();
+							gl.uniform2fv(ds.uniform('filterMin'), new Float32Array(filterMin));
+							gl.uniform2fv(ds.uniform('filterMax'), new Float32Array(filterMax));
+							
+							ds.attrib2buffer('aVertexPosition', glData.vertexBuffer, 3);
+							ds.attrib2buffer('aVertexFilter', filterBuffer !== null ? filterBuffer : glData.vertexBuffer, 2);
+
+							var pMatrix = makeOrtho(0, view.framebuffer.getW(), 0, view.framebuffer.getH(), -1.0, 1.0)
+							gl.uniformMatrix4fv(ds.uniform('uPMatrix'), false, new Float32Array(pMatrix.flatten()));
+							gl.uniform1f(ds.uniform('textureWidth'), view.framebuffer.getW());
+
+							// draw
+							view.framebuffer.bind();
+
+							// set view port to framebuffer size
+							gl.viewport(0, 0, view.framebuffer.getW(), view.framebuffer.getH());
+							
+							gl.clearColor(1, 1, 1, 1);
+							gl.clear(gl.COLOR_BUFFER_BIT);
+							gl.drawArrays(gl.POINTS, i0, drawLen);
+							gl.clearColor(0, 0, 0, 0);
+
+							view.framebuffer.unbind();
+							ds.unuseShader();
+
+							// return view port to canvas size
+							gl.viewport(0, 0, canvasSize.w, canvasSize.h);
+
+							// get buffer contents
+							var brushedTimePoints = [];
+							var pixels = view.framebuffer.readBufferContents();
+							if (pixels)
+							{
+								// process the pixels
+								for (var k=0, p=0, K=theData.getTimeLength(); k<K; k++, p += 3) 
+								{
+									if (pixels[p] == 0) {
+										brushedTimePoints.push(k);
+									}
+								}
+								view.setBrushedTimePoints(brushedTimePoints);
+							}
+						}
+						*/
 					}
 				
 					if (SHOW_SCATTER_LINES)
@@ -708,15 +858,7 @@ Tempo.prototype.renderGL = function()
 						ls.attrib2buffer('aVertexColor', glData.colorBuffer, 4);
 						ls.attrib2buffer('aVertexFilter', filterBuffer !== null ? filterBuffer : glData.vertexBuffer, 2);
 						
-
-						/*
-						gl.uniform1i(ls.uniform('filter'), this.scatterFilter ? 1 : 0);
-						if (this.scatterFilter) {
-							gl.uniform2fv(ls.uniform('xFilterRange'), new Float32Array(this.scatterFilter.xFilterRange));
-							gl.uniform2fv(ls.uniform('yFilterRange'), new Float32Array(this.scatterFilter.yFilterRange));
-						}
-						*/
-						
+						// draw
 						gl.uniform1i(ls.uniform('singleColor'), 1);
 						gl.drawArrays(gl.LINE_STRIP, i0, drawLen);
 
@@ -737,6 +879,7 @@ Tempo.prototype.renderGL = function()
 		screenOffset[0] += column.getW() + COLUMN_SPACING;
 	}
 }
+
 
 function timeRangeFromNormalized(nRange)
 {

@@ -229,6 +229,103 @@
 	</script>
 
 
+	<!-- scatter plot seleciton shader: we use it to dump the points within the brush
+	to an offline texture -->
+	<script id="shader-vs-brush-dump" type="x-shader/x-vertex">
+		precision mediump float;
+		attribute vec3 aVertexPosition;
+		attribute vec2 aVertexFilter;
+
+		// projection matrix
+		uniform mat4 uPMatrix;
+
+		// width of texture
+		uniform float textureWidth;
+		
+		// filter, to be used in brushing and linking
+		uniform vec2 filterMin;
+		uniform vec2 filterMax;
+
+		void main(void) 
+		{
+			bvec2 exclude = equal(aVertexFilter, vec2(9999.0));
+			vec2 dumpCoord = vec2(-99.0, -99.0);
+			
+			if (!any(exclude)) 
+			{	
+				bvec2 m0 = greaterThanEqual(aVertexFilter, filterMin);
+				bvec2 m1 = lessThanEqual(aVertexFilter, filterMax);
+					
+				if (all(m0) && all(m1)) 
+				{
+					// ** pass
+					float floored = floor(aVertexPosition.z / textureWidth);
+					dumpCoord = vec2(aVertexPosition.z - floored * textureWidth, floored);
+				}
+			}
+			gl_Position = uPMatrix * vec4(dumpCoord+vec2(0.5), 0.0, 1.0);
+			gl_PointSize = 1.0;
+		}
+	</script>
+	<script id="shader-fs-brush-dump" type="x-shader/x-fragment">
+		void main() {
+			gl_FragColor = vec4(0, 0, 0, 1);
+		}
+	</script>
+	
+	<!-- scatter plot seleciton shader: we use it to dump the points within the brush
+	to an offline texture -->
+	<script id="shader-vs-timeline-brush" type="x-shader/x-vertex">
+		precision mediump float;
+		attribute vec3 aVertexPosition;
+		attribute vec2 aVertexFilter;
+
+		// projection matrix
+		uniform mat4 uPMatrix;
+
+		// time range
+		uniform float minTime;
+		uniform float timeLen;
+		uniform vec2 rangeMin;
+		uniform vec2 rangeLen;
+
+		// filter, to be used in brushing and linking
+		uniform vec2 filterMin;
+		uniform vec2 filterMax;
+
+		void main(void) 
+		{
+			bvec2 exclude = equal(aVertexFilter, vec2(9999.0));
+			vec2 timelinePoint = vec2(-999.0, -999.0);
+			
+			if (!any(exclude)) 
+			{	
+				bvec2 m0 = greaterThanEqual(aVertexFilter, filterMin);
+				bvec2 m1 = lessThanEqual(aVertexFilter, filterMax);
+					
+				if (all(m0) && all(m1)) 
+				{
+					// ** pass
+					timelinePoint = rangeMin + rangeLen *
+						vec2( (aVertexPosition.z - minTime) / timeLen, 0.5);
+				}
+			}
+			gl_Position = uPMatrix * vec4(timelinePoint, 0.0, 1.0);
+			gl_PointSize = 4.0;
+		}
+	</script>
+	<script id="shader-fs-timeline-brush" type="x-shader/x-fragment">
+		precision mediump float;
+		const vec3 HI_COLOR = vec3(0.702*1.1, 0, 0);
+
+		void main() 
+		{
+			float dist = distance( gl_PointCoord, vec2(0.5) );
+			float alpha = 1.0 - smoothstep(0.45,0.5,dist);
+			gl_FragColor = vec4(HI_COLOR, alpha * 0.25);
+		}
+	</script>
+
 	<!-- connected scatterplot shader -->
 	<script id="shader-vs-lines" type="x-shader/x-vertex">
 		precision mediump float;
@@ -324,9 +421,6 @@
 		void main(void) {
 			gl_FragColor = vec4(vColor.rgb, MAX_LINE_OPACITY * vColor.a * smoothstep(0.5, 0.9, inFilter));
 		}
-	</script>
-
-
 	</script>
 
 
