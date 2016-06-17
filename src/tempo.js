@@ -38,6 +38,11 @@ var POINT_SIZE = 10.0;
 // width of lines
 var LINE_WIDTH = 2.0;
 
+// type of filter to use
+var FILTER_NONE = 0;
+var FILTER_SCATTER = 1;
+var FILTER_TIME = 2;
+
 function Tempo()
 {
 	this.vis = d3.select("#visSVG");
@@ -439,8 +444,17 @@ Tempo.prototype.setScatterFilter = function(filter)
 	this.renderGL();
 }
 
+Tempo.prototype.setTimeFilter = function(filter)
+{
+	this.timeFilter = filter;
+	this.renderGL();
+}
+
 Tempo.prototype.startBrush = function(instigator)
 {
+	this.scatterFilter = undefined;
+	this.timeFilter = undefined;
+
 	for (var i=0, N=this.columns.length; i<N; i++) 
 	{
 		var column = this.columns[i].column;
@@ -449,7 +463,7 @@ Tempo.prototype.startBrush = function(instigator)
 		{
 			if (views[j] != instigator) 
 			{
-				views[j].clearBrush();
+				views[j].clearBrushes();
 			}
 		}
 	}
@@ -572,8 +586,10 @@ Tempo.prototype.renderGL = function()
 			var filterBuffer = null;
 
 			// see if we have a filter set
+			var filterType = FILTER_NONE;
 			if (this.scatterFilter)
 			{
+				filterType = FILTER_SCATTER;
 				var xFilterVar = this.scatterFilter.xFilterVar;
 				var yFilterVar = this.scatterFilter.yFilterVar;
 
@@ -590,6 +606,10 @@ Tempo.prototype.renderGL = function()
 					// store it
 					glData.filters.set(filterKey, filterBuffer);
 				}
+			}
+			else if (this.timeFilter)
+			{
+				filterType = FILTER_TIME;
 			}
 
 
@@ -621,10 +641,10 @@ Tempo.prototype.renderGL = function()
 						
 						// only apply point filter (i.e., brushing) if we're not showing lines
 						// otherwise the color of the brushed points intefers with line perception
-						var pointFilter = SHOW_SCATTER_LINES ? false : this.scatterFilter ? true : false;
-						gl.uniform1i(ps.uniform('filter'), pointFilter ? 1 : 0);
+						var pointFilter = SHOW_SCATTER_LINES ? FILTER_NONE : filterType;
+						gl.uniform1i(ps.uniform('filter'), pointFilter);
 						
-						if (this.scatterFilter) 
+						if (pointFilter == FILTER_SCATTER) 
 						{
 							var xFilterRange = this.scatterFilter.xFilterRange;
 							var yFilterRange = this.scatterFilter.yFilterRange;
@@ -634,8 +654,15 @@ Tempo.prototype.renderGL = function()
 							gl.uniform2fv(ps.uniform('filterMin'), new Float32Array(filterMin));
 							gl.uniform2fv(ps.uniform('filterMax'), new Float32Array(filterMax));
 						}
+						else if (pointFilter == FILTER_TIME)
+						{
+							var filterMin = [this.timeFilter.timeWindow[0], 0.0];
+							var filterMax = [this.timeFilter.timeWindow[1], 0.0];
+							gl.uniform2fv(ps.uniform('filterMin'), new Float32Array(filterMin));
+							gl.uniform2fv(ps.uniform('filterMax'), new Float32Array(filterMax));
+						}
 						
-						ps.attrib2buffer('aVertexPosition', glData.vertexBuffer, 2);
+						ps.attrib2buffer('aVertexPosition', glData.vertexBuffer, 3);
 						ps.attrib2buffer('aVertexFilter', filterBuffer !== null ? filterBuffer : glData.vertexBuffer, 2);
 
 						gl.drawArrays(gl.POINTS, i0, drawLen);
@@ -652,9 +679,9 @@ Tempo.prototype.renderGL = function()
 
 						// update the uniform
 						ls.useShader();
-						gl.uniform1i(ls.uniform('filter'), this.scatterFilter ? 1 : 0);
+						gl.uniform1i(ls.uniform('filter'), filterType);
 						
-						if (this.scatterFilter) 
+						if (filterType == FILTER_SCATTER) 
 						{
 							var xFilterRange = this.scatterFilter.xFilterRange;
 							var yFilterRange = this.scatterFilter.yFilterRange;
@@ -664,13 +691,20 @@ Tempo.prototype.renderGL = function()
 							gl.uniform2fv(ls.uniform('filterMin'), new Float32Array(filterMin));
 							gl.uniform2fv(ls.uniform('filterMax'), new Float32Array(filterMax));
 						}
+						else if (filterType == FILTER_TIME)
+						{
+							var filterMin = [this.timeFilter.timeWindow[0], 0.0];
+							var filterMax = [this.timeFilter.timeWindow[1], 0.0];
+							gl.uniform2fv(ls.uniform('filterMin'), new Float32Array(filterMin));
+							gl.uniform2fv(ls.uniform('filterMax'), new Float32Array(filterMax));
+						}
 
 						gl.uniform2fv(ls.uniform('rangeMin'), new Float32Array(rangeMin));
 						gl.uniform2fv(ls.uniform('rangeLen'), new Float32Array(rangeLen));
 						gl.uniform2fv(ls.uniform('domainMin'), new Float32Array(domainMin));
 						gl.uniform2fv(ls.uniform('domainLen'), new Float32Array(domainLen));
 						
-						ls.attrib2buffer('aVertexPosition', glData.vertexBuffer, 2);
+						ls.attrib2buffer('aVertexPosition', glData.vertexBuffer, 3);
 						ls.attrib2buffer('aVertexColor', glData.colorBuffer, 4);
 						ls.attrib2buffer('aVertexFilter', filterBuffer !== null ? filterBuffer : glData.vertexBuffer, 2);
 						

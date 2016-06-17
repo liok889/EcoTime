@@ -128,8 +128,9 @@
 
 	<!-- scatterplot points shader -->
 	<script id="shader-vs-points" type="x-shader/x-vertex">
+
 		precision mediump float;
-		attribute vec2 aVertexPosition;
+		attribute vec3 aVertexPosition;
 		attribute vec2 aVertexFilter;
 
 		uniform mat4 uMVMatrix;
@@ -143,7 +144,7 @@
 		uniform float pointOpacity;
 		
 		// filter, to be used in brushing and linking
-		uniform bool filter;
+		uniform int filter;
 		uniform vec2 filterMin;
 		uniform vec2 filterMax;
 
@@ -153,10 +154,15 @@
 		// color of points
 		const vec3 COLOR = vec3(0.15);
 		const vec3 HI_COLOR = vec3(0.702*1.1, 0, 0);
-		    
+
+		// type of filter
+		const int FILTER_NONE = 0;
+		const int FILTER_SCATTER = 1;
+		const int FILTER_TIME = 2;
+
 		void main(void) 
 		{
-			vec2 p = ((aVertexPosition - domainMin) / domainLen);
+			vec2 p = ((aVertexPosition.xy - domainMin) / domainLen);
 			p.y = 1.0 - p.y;
 			gl_Position = uPMatrix * uMVMatrix * vec4(p * rangeLen + rangeMin, 0.0, 1.0);
 			
@@ -164,7 +170,7 @@
 			gl_PointSize = pointSize;
 
 			// see if we are filter
-			if (filter) {
+			if (filter == FILTER_SCATTER) {
 
 				bvec2 exclude = equal(aVertexFilter, vec2(9999.0));
 				if (any(exclude)) {
@@ -186,6 +192,18 @@
 						// not within filter
 						pointColor = vec4(COLOR, 1);
 					}
+				}
+			}
+			else if (filter == FILTER_TIME)
+			{
+				
+				if (aVertexPosition.z >= filterMin[0] && aVertexPosition.z <= filterMax[0]) 
+				{
+					pointColor = vec4(HI_COLOR, 1.65);
+				}
+				else
+				{
+					pointColor = vec4(COLOR, 1);
 				}
 			}
 			else
@@ -214,7 +232,7 @@
 	<!-- connected scatterplot shader -->
 	<script id="shader-vs-lines" type="x-shader/x-vertex">
 		precision mediump float;
-		attribute vec2 aVertexPosition;
+		attribute vec3 aVertexPosition;
 		attribute vec4 aVertexColor;   
 		attribute vec2 aVertexFilter;
 
@@ -227,22 +245,27 @@
 		uniform bool singleColor;
 
 		// filter, to be used in brushing and linking
-		uniform bool filter;
+		uniform int filter;
 		uniform vec2 filterMin;
 		uniform vec2 filterMax;
 
 		// color
 		varying lowp vec4 vColor;
 		varying lowp float inFilter;
-				    
+
+		// type of filter
+		const int FILTER_NONE = 0;
+		const int FILTER_SCATTER = 1;
+		const int FILTER_TIME = 2;
+
 		void main(void) 
 		{
-			vec2 p = ((aVertexPosition - domainMin) / domainLen);
+			vec2 p = ((aVertexPosition.xy - domainMin) / domainLen);
 			p.y = 1.0 - p.y;
 			gl_Position = uPMatrix * uMVMatrix * vec4(p * rangeLen + rangeMin, 0.0, 1.0);
 
 			// see if we are filter
-			if (filter) {
+			if (filter == FILTER_SCATTER) {
 
 				bvec2 exclude = equal(aVertexFilter, vec2(9999.0));
 				if (any(exclude)) {
@@ -266,8 +289,19 @@
 					}
 				}
 			}
+			else if (filter == FILTER_TIME)
+			{
+				if (aVertexPosition.z >= filterMin[0] && aVertexPosition.z <= filterMax[0]) {
+					inFilter = 1.0;
+				}
+				else
+				{
+					inFilter = 0.0;
+				}
+			}
 			else
 			{
+				// no filter
 				inFilter = 1.0;
 			}
 

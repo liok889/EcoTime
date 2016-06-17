@@ -111,6 +111,7 @@ TimeColumn.prototype.updateScatterSize = function(instigator, newW, newH)
 	}
 }
 
+
 TimeColumn.prototype.initiateToggleLinechartView = function(view)
 {
 	// identify the view index

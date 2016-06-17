@@ -61,8 +61,12 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height, linechartH,
 		scatterview.yB = d3.scale.identity().domain([0, scatterview.h - SCATTER_PAD*2]);
 		scatterview.brush = d3.svg.brush()
 			.x(scatterview.xB).y(scatterview.yB)
-			.on("brushstart", function() {
+			.on("brushstart", function() 
+			{
 				tempo.startBrush(scatterview);
+				
+				// clear my linebrush
+				scatterview.linechartGroup.select("g.brush").call(scatterview.linechartBrush.clear());
 			})
 			.on("brush", function() 
 			{
@@ -162,17 +166,44 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height, linechartH,
 	this.linechartContent = this.linechartGroup.append("g")
 		.style("visibility", this.linechartVisibility ? "visible" : "hidden")
 		.attr('clip-path', 'url(#' + this.clipPathID + ')');
-	
-	var linechartData = this.linechartContent.append("g")
-		.attr("class", "linechartData");
-	linechartData.append("g").attr("class", "xLinechart");
-	linechartData.append("g").attr("class", "yLinechart");
 
-
+	// border rectangle for linechart view
 	this.linechartRect = this.linechartGroup.append("rect")
 		.attr("class", "scatterBorderRect")
 		.attr("width", this.linechartW)
 		.attr("height", this.linechartVisibility ? linechartH : 0);
+
+	// line chart brush
+	(function(scatterview) {
+		scatterview.linechartBrush = d3.svg.brush()
+			.x(d3.scale.identity().domain([0, scatterview.w-LINECHART_PAD_W*2]))
+			.on("brushstart", function() {
+				tempo.startBrush(scatterview);
+
+				// clear my scatter brush
+				scatterview.brushGroup.select('.brush').call(scatterview.brush.clear());
+			})
+			.on("brush", function() {
+				scatterview.doLinechartBrush();
+			});
+	})(this)
+
+	this.linechartGroup.append("g")
+		.attr('transform', 'translate(' + LINECHART_PAD_W + ',' + LINECHART_PAD_H + ')')
+		.append('g')
+			.attr('class', 'brush')
+			.call(this.linechartBrush)
+			.selectAll('rect')
+				.attr('y', -LINECHART_PAD_H).attr('height', this.linechartH);
+
+	// data group
+	var linechartData = this.linechartContent.append("g")
+		.attr("class", "linechartData");
+	
+	// group for X and Y timeseries
+	linechartData.append("g").attr("class", "xLinechart");
+	linechartData.append("g").attr("class", "yLinechart");
+
 
 	// append a resize rectangle at the lower-left corner
 	this.resizeScatter = new InlineButton(
@@ -232,6 +263,33 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height, linechartH,
 	})(this);
 }
 
+ScatterView.prototype.doLinechartBrush = function()
+{
+	var brush = this.linechartBrush;
+	var e = brush.extent();
+
+	if (e[0] == e[1] || brush.empty())
+	{
+		// brush is pretty much empty
+		tempo.setTimeFilter();
+	}
+	else {
+		
+		var tInverseScale = d3.scale.linear()
+			.domain([0, this.w - LINECHART_PAD_W*2])
+			.range(this.timeRange);
+
+		var w0 = Math.floor(tInverseScale(e[0]) + 0.5);
+		var w1 = Math.min(Math.floor(tInverseScale(e[1]) + 0.5), theData.getTimeLength()-1);
+
+
+		var timeFilter = {
+			timeWindow: [w0, w1],
+		};
+		tempo.setTimeFilter(timeFilter);
+	}
+}
+
 ScatterView.prototype.doScatterBrush = function()
 {
 	var e = this.brush.extent();
@@ -276,9 +334,10 @@ ScatterView.prototype.doScatterBrush = function()
 	}
 }
 
-ScatterView.prototype.clearBrush = function()
+ScatterView.prototype.clearBrushes = function()
 {
 	this.brushGroup.select('.brush').call(this.brush.clear());
+	this.linechartGroup.select('.brush').call(this.linechartBrush.clear());
 }
 
 ScatterView.prototype.setTimeRange = function(timeRange)
@@ -374,7 +433,7 @@ ScatterView.prototype.getGroup = function()
 
 ScatterView.prototype.updateSize = function(w, h)
 {
-	var oldW = this.w, oldH = this.h;
+	var oldW = this.w, oldH = this.h, oldLinechartH = this.linechartH;
 
 	this.w = w || this.w;
 	this.h = h ? h.scatter : this.h;
@@ -448,6 +507,35 @@ ScatterView.prototype.updateSize = function(w, h)
 		this.brush.extent([[x0, y0], [x1, y1]]);
 
 	}
+
+	this.linechartBrush
+		.x(d3.scale.identity().domain([0, this.w-LINECHART_PAD_W*2]));
+	
+	if (!this.linechartBrush.empty())
+	{
+		// adapt brush extents to new dimensions
+		var xInverseScale = d3.scale.linear()
+			.domain([0, oldW - LINECHART_PAD_W*2])
+			.range(this.timeRange);
+					
+		var xNewScale = d3.scale.linear()
+			.domain([this.timeRange[0], this.timeRange[1]])
+			.range(this.timeRange);
+
+		var e = this.linechartBrush.extent();
+		var 
+			x0 = xNewScale(xInverseScale(e[0])), 
+			x1 = xNewScale(xInverseScale(e[1]));
+	
+		this.linechartBrush.extent([x0, x1]);
+	}
+
+	// update the brushes
+	this.linechartGroup.select("g.brush")
+		.call(this.linechartBrush)
+		.selectAll('rect')
+			.attr('y', -LINECHART_PAD_H).attr('height', this.linechartH);
+
 	this.brushGroup.select(".brush").call(this.brush);
 }
 
@@ -652,8 +740,9 @@ function getPairedTimeseries(xVar, yVar, xFilter, yFilter)
 				
 				if (b1 && b2)  
 				{
-					vertices.push( v1 );
-					vertices.push( v2 );
+					vertices.push(  v1  );
+					vertices.push(  v2  );
+					vertices.push(  i   );
 
 					s1[i] = v1;
 					s2[i] = v2;		
