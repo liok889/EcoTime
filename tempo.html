@@ -145,6 +145,8 @@
 		
 		// filter, to be used in brushing and linking
 		uniform int filter;
+		uniform int renderFilter;
+
 		uniform vec2 filterMin;
 		uniform vec2 filterMax;
 
@@ -160,22 +162,27 @@
 		const int FILTER_SCATTER = 1;
 		const int FILTER_TIME = 2;
 
+		const int RENDER_FILTER_NONE = 0;
+		const int RENDER_FILTER_IN = 1;
+		const int RENDER_FILTER_OUT = 2;
+
 		void main(void) 
 		{
+			bool inFilter = true;
 			vec2 p = ((aVertexPosition.xy - domainMin) / domainLen);
-			p.y = 1.0 - p.y;
-			gl_Position = uPMatrix * uMVMatrix * vec4(p * rangeLen + rangeMin, 0.0, 1.0);
 			
-			// the size of the point
-			gl_PointSize = pointSize;
+			// flip y coordinate
+			p.y = 1.0 - p.y;
 
 			// see if we are filter
 			if (filter == FILTER_SCATTER) {
 
 				bvec2 exclude = equal(aVertexFilter, vec2(9999.0));
-				if (any(exclude)) {
+				if (any(exclude)) 
+				{
 					// not within filter
 					pointColor = vec4(COLOR, 1);
+					inFilter = false;
 				}
 				else
 				{
@@ -191,6 +198,7 @@
 					{
 						// not within filter
 						pointColor = vec4(COLOR, 1);
+						inFilter = false;
 					}
 				}
 			}
@@ -199,11 +207,14 @@
 				
 				if (aVertexPosition.z >= filterMin[0] && aVertexPosition.z <= filterMax[0]) 
 				{
+					// ** Highlight
 					pointColor = vec4(HI_COLOR, 1.65);
 				}
 				else
 				{
+					// not within filter
 					pointColor = vec4(COLOR, 1);
+					inFilter = false;
 				}
 			}
 			else
@@ -211,6 +222,23 @@
 				// no filter; normal color
 				pointColor = vec4(COLOR, 1);
 			}
+
+			if (renderFilter == RENDER_FILTER_IN && !inFilter) 
+			{
+				// throw out point
+				p = vec2(-999.0);
+			}
+			else if (renderFilter == RENDER_FILTER_OUT && inFilter) 
+			{
+				// throw out point
+				p = vec2(-999.0);
+			}
+
+			// project / clip
+			gl_Position = uPMatrix * uMVMatrix * vec4(p * rangeLen + rangeMin, 0.0, 1.0);
+			
+			// the size of the point
+			gl_PointSize = pointSize;
 		}
 
 	</script>

@@ -43,6 +43,11 @@ var FILTER_NONE = 0;
 var FILTER_SCATTER = 1;
 var FILTER_TIME = 2;
 
+// type of render filter for the points
+var RENDER_FILTER_NONE = 0;
+var RENDER_FILTER_IN = 1;
+var RENDER_FILTER_OUT = 2;
+
 var TIMELINE_BRUSH_THICKNESS = 4;
 
 function Tempo()
@@ -522,7 +527,7 @@ Tempo.prototype.renderGL = function()
 			['aVertexPosition', 'aVertexFilter'],
 			[	'pointOpacity', 'pointSize',
 				'uPMatrix', 'uMVMatrix', 'rangeMin', 'rangeLen', 'domainMin', 'domainLen',
-				'filter', 'filterMin', 'filterMax'
+				'filter', 'filterMin', 'filterMax', 'renderFilter'
 			]);
 	}
 
@@ -717,7 +722,17 @@ Tempo.prototype.renderGL = function()
 						ps.attrib2buffer('aVertexFilter', filterBuffer !== null ? filterBuffer : glData.vertexBuffer, 2);
 
 						// draw
-						gl.drawArrays(gl.POINTS, i0, drawLen);
+						// two passes: first one for points that are out of filter and second for points that are within
+						// this way we gaurantee that brushed points are on the top, unoccluded
+						// by non-brushed ones
+						for (var pass=0, count=(pointFilter == FILTER_NONE ? 1 : 2); pass < count; pass++) 
+						{
+							gl.uniform1i(ps.uniform('renderFilter'), 
+								count == 1 ? RENDER_FILTER_NONE : 
+								(pass==0 ? RENDER_FILTER_OUT : RENDER_FILTER_IN)
+							);
+							gl.drawArrays(gl.POINTS, i0, drawLen);
+						}
 
 						ps.unuseShader();
 						gl.disable(gl.BLEND);
