@@ -12,7 +12,7 @@ var DEF_SCATTER_H = 115;
 var BUTTON_SIZE = 10;
 
 // padding inside the scatterplot view
-var SCATTER_PAD = 10;
+var SCATTER_PAD = 12;
 var LINECHART_PAD_W = 4;
 var LINECHART_PAD_H = 2;
 // size of the text
@@ -27,6 +27,12 @@ var DEF_LINECHART_VISIBILITY = false;
 var DEF_LINECHART_H = 30;
 var EXPAND_DURATION = 150;
 
+// line chart modes (superimposed of separate)
+var LINECHART_MODE_ONE = 1;
+var LINECHART_MODE_TWO = 2;
+var DEF_LINECHART_MODE = LINECHART_MODE_ONE;
+
+// counter of views
 var SCATTER_ID = 0;
 
 function ScatterView(parentColumn, group, xVar, yVar, width, height, linechartH, linechartVisibility)
@@ -147,6 +153,7 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height, linechartH,
 
 	this.linechartW = DEF_SCATTER_W;
 	this.linechartH = linechartH || DEF_LINECHART_H;
+	this.linechartMode = DEF_LINECHART_MODE;
 
 	// create a clipping rectangle for linechart view
 	var defs = d3.select(getSVG(this.group.node())).select("defs");
@@ -230,6 +237,14 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height, linechartH,
 		'assets/expand.png'
 	);
 
+	this.linechartModeButton = new InlineButton(
+		this.group,
+		1 + BUTTON_SIZE, this.h - BUTTON_SIZE-1,
+		BUTTON_SIZE, BUTTON_SIZE,
+		'assets/linechart.png'
+	);
+
+
 	(function(scatterview) 
 	{
 		scatterview.resizeScatter.on("resize", function(dMouse) 
@@ -259,6 +274,13 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height, linechartH,
 		{
 			scatterview.column.initiateToggleLinechartView(scatterview);
 		});
+
+		scatterview.linechartModeButton.on("click", function() {
+			var mode = scatterview.setLinechartMode(null, true)
+			if (shiftKey) {
+				tempo.setLinechartMode(mode);
+			}
+		})
 
 	})(this);
 }
@@ -366,6 +388,24 @@ ScatterView.prototype.isLinechartVisible = function()
 {
 	return this.linechartContent.style("visibility") == "visible";
 }
+ScatterView.prototype.setLinechartMode = function(mode, toggle)
+{
+	if (mode !== undefined && mode !== null) {
+		this.linechartMode = mode;
+	}
+	else if (toggle !== undefined && toggle !== null) {
+		if (this.linechartMode == LINECHART_MODE_ONE) {
+			this.linechartMode = LINECHART_MODE_TWO;
+		}
+		else {
+			this.linechartMode = LINECHART_MODE_ONE;
+		}
+	}
+	if (this.linechartVisibility) {
+		this.updateLinechartTransform(true);
+	}
+	return this.linechartMode;
+}
 
 ScatterView.prototype.toggleLinechartView = function(startCallback, endCallback)
 {
@@ -397,6 +437,13 @@ ScatterView.prototype.toggleLinechartView = function(startCallback, endCallback)
 		}
 		else
 		{
+			if (!scatterview.linechartBrush.empty()) {
+				// clear the brush
+				scatterview.linechartGroup.select("g.brush")
+					.call(scatterview.linechartBrush.clear());
+				tempo.setTimeFilter();
+
+			}
 			// hide
 			scatterview.linechartVisibility = false;
 			scatterview.linechartContent.style("visibility", "hidden");
@@ -459,8 +506,8 @@ ScatterView.prototype.updateSize = function(w, h)
 		.attr("x", this.w-BUTTON_SIZE-1)
 		.attr("y", this.h-BUTTON_SIZE-1+this.linechartH);
 
-	this.expandButton
-		.attr("x", "1").attr("y", this.h - BUTTON_SIZE-1);
+	this.expandButton.attr("y", this.h - BUTTON_SIZE-1);
+	this.linechartModeButton.attr("y", this.h - BUTTON_SIZE-1);
 
 	// linechart group
 	this.linechartGroup
@@ -687,6 +734,7 @@ ScatterView.prototype.updateLinechart = function(forceUpdate)
 	}
 
 	// update the transform
+	/*
 	var xScaleFactor = (this.w - LINECHART_PAD_W*2) / (this.timeRange[1]-this.timeRange[0]);
 	var xTranslate = -this.timeRange[0];
 
@@ -700,7 +748,64 @@ ScatterView.prototype.updateLinechart = function(forceUpdate)
 
 	this.linechartContent.select("g.linechartData")
 		.attr("transform", transform);
+	*/
+	this.updateLinechartTransform();
+
 }
+
+ScatterView.prototype.updateLinechartTransform = function(transition)
+{
+	var transform1, transform2;
+
+	if (this.linechartMode == LINECHART_MODE_ONE)
+	{
+		var xScaleFactor = (this.w - LINECHART_PAD_W*2) / (this.timeRange[1]-this.timeRange[0]);
+		var xTranslate = -this.timeRange[0];
+
+		var yScaleFactor = this.linechartH - LINECHART_PAD_H*2
+		var yTranslate = 0;
+
+		var transform = 	
+			'translate(' + LINECHART_PAD_W + ',' + LINECHART_PAD_H + ') ' +
+			'scale(' + xScaleFactor + ',' + yScaleFactor + ') '	+
+			'translate(' + xTranslate + ',' + yTranslate + ')';
+		
+		transform1 = transform;
+		transform2 = transform;
+	}
+	else
+	{
+		var xScaleFactor = (this.w - LINECHART_PAD_W*2) / (this.timeRange[1]-this.timeRange[0]);
+		var xTranslate = -this.timeRange[0];
+
+		var yScaleFactor = (this.linechartH - LINECHART_PAD_H*2)/2 - 1
+		var yTranslate = 0;
+
+		transform1 = 	
+			'translate(' + LINECHART_PAD_W + ',' + LINECHART_PAD_H + ') ' +
+			'scale(' + xScaleFactor + ',' + yScaleFactor + ') '	+
+			'translate(' + xTranslate + ',' + yTranslate + ')';
+
+		transform2 =
+			'translate(' + LINECHART_PAD_W + ',' + (LINECHART_PAD_H + yScaleFactor + 1) + ') ' +
+			'scale(' + xScaleFactor + ',' + yScaleFactor + ') '	+
+			'translate(' + xTranslate + ',' + yTranslate + ')';
+	}
+	
+	var xLinechart = this.linechartContent.select("g.xLinechart");
+	if (transition) {
+		xLinechart = xLinechart.transition();
+	}
+	xLinechart.attr("transform", transform1);
+	
+
+	var yLinechart = this.linechartContent.select("g.yLinechart");
+	if (transition) {
+		yLinechart = yLinechart.transition();
+	}		
+	yLinechart.attr("transform", transform2);
+}
+
 
 // GL render
 // ==============

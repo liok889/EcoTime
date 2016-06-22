@@ -463,6 +463,16 @@ Tempo.prototype.setTimeFilter = function(filter)
 	this.renderGL();
 }
 
+Tempo.prototype.setLinechartMode = function(mode)
+{
+	console.log("all setLinechartMode: " + mode);
+	var views = this.getAllViews();
+	for (var i=0, N=views.length; i<N; i++) {
+		views[i].setLinechartMode(mode);
+		DEF_LINECHART_MODE = mode;
+	}	
+}
+
 Tempo.prototype.getAllViews = function() {
 	var views = [];
 	for (var i=0, N=this.columns.length; i<N; i++) {
