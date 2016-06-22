@@ -958,6 +958,8 @@ function getPairedFilter(xVar, yVar, xFilterVar, yFilterVar)
 	return filterBuffer;
 }
 
+var MAX_CHUNK_LEN = 200;
+
 function chunketize(series, N)
 {
 	var chunk = null, chunks = [], points = [];
@@ -977,6 +979,12 @@ function chunketize(series, N)
 			chunk.push({x: i, y: 1.0 - v});
 			chunkIndices[i] = chunks.length;
 			pointIndices[i] = pIndex;
+
+			if (MAX_CHUNK_LEN && chunk.length > MAX_CHUNK_LEN) {
+				cIndex = chunks.length;
+				chunks.push(chunk);
+				chunk = [{x: i, y: 1.0 - v}];
+			}
 		}
 		else
 		{
