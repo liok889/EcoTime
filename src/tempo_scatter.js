@@ -870,9 +870,13 @@ function getPairedTimeseries(xVar, yVar, xFilter, yFilter)
 					var timestep = new Date(beginTime + i*timestepOffset);
 					var dayOffset = timestep.getHours() * 60*60*1000 + timestep.getMinutes() * 60*1000;
 					var dayOffsetN = dayOffset / (24*60*60*1000-1);
+
+					// add the day offset
+					var colorIndex = colorScale(dayOffsetN);
+					vertices.push( colorIndex );
 					
 					// map to color
-					var color = COLOR_SCALE[colorScale(dayOffsetN)];
+					var color = COLOR_SCALE[ colorIndex ];
 
 					colors.push( color[0]/255 );
 					colors.push( color[1]/255 );

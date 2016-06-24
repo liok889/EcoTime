@@ -50,6 +50,15 @@ var RENDER_FILTER_OUT = 2;
 
 var TIMELINE_BRUSH_THICKNESS = 4;
 
+
+// color source
+var COLOR_CONSTANT = 0;
+var COLOR_TIME_OF_DAY = 1;
+var COLOR_TIME_WINDOW = 2;
+
+var POINT_COLOR_SOURCE = COLOR_CONSTANT;
+var LINE_COLOR_SOURCE = COLOR_TIME_OF_DAY;
+
 function Tempo()
 {
 	this.vis = d3.select("#visSVG");
@@ -163,6 +172,19 @@ var SLIDER_COLORS = [
 var SLIDER_DEFAULT_COLOR = "#cccccc";
 
 
+// color scales
+var COLOR_SCALES = [
+	[
+		[178,24,43],
+		[178,24,43],
+		[239,138,98],
+		[70, 70, 70],
+		[103,169,207],
+		[33,102,172],
+		[33,102,172]
+	].reverse()
+];
+var COLOR_SCALE_INDEX = 0;
 
 function connectSliderToColumn(ribbon, slider, column)
 {
@@ -503,6 +525,26 @@ Tempo.prototype.startBrush = function(instigator)
 	}
 }
 
+Tempo.prototype.setPointColorSource = function(colorSource)
+{
+	POINT_COLOR_SOURCE = colorSource
+	this.renderGL();
+}
+Tempo.prototype.getPointColorSource = function()
+{
+	return POINT_COLOR_SOURCE;
+}
+Tempo.prototype.setLineColorSource = function(colorSource)
+{
+	LINE_COLOR_SOURCE = colorSource
+	this.renderGL();
+}
+Tempo.prototype.getLineColorSource = function()
+{
+	return LINE_COLOR_SOURCE;
+}
+
+
 Tempo.prototype.renderGL = function()
 {
 	// initialize the shader
@@ -537,7 +579,7 @@ Tempo.prototype.renderGL = function()
 			['aVertexPosition', 'aVertexFilter'],
 			[	'pointOpacity', 'pointSize',
 				'uPMatrix', 'uMVMatrix', 'rangeMin', 'rangeLen', 'domainMin', 'domainLen',
-				'filter', 'filterMin', 'filterMax', 'renderFilter'
+				'filter', 'filterMin', 'filterMax', 'renderFilter', 'colorSource', 'colorScale'
 			]);
 	}
 
@@ -553,6 +595,7 @@ Tempo.prototype.renderGL = function()
 			]);
 	}
 
+	/*
 	if (!this.scatterDumpShader)
 	{
 		this.scatterDumpShader = new Shader(gl,
@@ -565,6 +608,7 @@ Tempo.prototype.renderGL = function()
 				'rangeMin', 'rangeLen'
 			]);
 	}
+	*/
 
 	if (!this.timelineBrushShader)
 	{
@@ -578,6 +622,19 @@ Tempo.prototype.renderGL = function()
 				'rangeMin', 'rangeLen'
 			]);		
 	}
+
+	// prepare color scale array
+	var rgbScale = COLOR_SCALES[ COLOR_SCALE_INDEX ];
+	var colorScaleData = [];
+	for (var i=0; i<rgbScale.length; i++) 
+	{
+		var c = rgbScale[i];
+		for (var j=0; j<3; j++) 
+		{
+			colorScaleData.push( c[j] / 255 );
+		}
+	}
+
 
 	// clear
 	gl.clear(gl.COLOR_BUFFER_BIT);
@@ -704,6 +761,10 @@ Tempo.prototype.renderGL = function()
 						gl.uniform2fv(ps.uniform('domainLen'), new Float32Array(domainLen));
 						gl.uniform1f(ps.uniform('pointSize'), POINT_SIZE);
 						gl.uniform1f(ps.uniform('pointOpacity'), POINT_OPACITY);
+						gl.uniform1i(ps.uniform('colorSource'), POINT_COLOR_SOURCE);
+
+						// color scale
+						gl.uniform1fv(ps.uniform('colorScale'), new Float32Array(colorScaleData));
 						
 						// only apply point filter (i.e., brushing) if we're not showing lines
 						// otherwise the color of the brushed points intefers with line perception
@@ -728,7 +789,7 @@ Tempo.prototype.renderGL = function()
 							gl.uniform2fv(ps.uniform('filterMax'), new Float32Array(filterMax));
 						}
 						
-						ps.attrib2buffer('aVertexPosition', glData.vertexBuffer, 3);
+						ps.attrib2buffer('aVertexPosition', glData.vertexBuffer, 4);
 						ps.attrib2buffer('aVertexFilter', filterBuffer !== null ? filterBuffer : glData.vertexBuffer, 2);
 
 						// draw
@@ -767,7 +828,7 @@ Tempo.prototype.renderGL = function()
 						gl.uniform2fv(tl.uniform('filterMin'), new Float32Array(filterMin));
 						gl.uniform2fv(tl.uniform('filterMax'), new Float32Array(filterMax));
 							
-						tl.attrib2buffer('aVertexPosition', glData.vertexBuffer, 3);
+						tl.attrib2buffer('aVertexPosition', glData.vertexBuffer, 4);
 						tl.attrib2buffer('aVertexFilter', filterBuffer !== null ? filterBuffer : glData.vertexBuffer, 2);
 
 						gl.uniformMatrix4fv(tl.uniform('uPMatrix'), false, new Float32Array(projectionMatrix.flatten()));
@@ -879,7 +940,7 @@ Tempo.prototype.renderGL = function()
 						gl.uniform2fv(ls.uniform('domainMin'), new Float32Array(domainMin));
 						gl.uniform2fv(ls.uniform('domainLen'), new Float32Array(domainLen));
 						
-						ls.attrib2buffer('aVertexPosition', glData.vertexBuffer, 3);
+						ls.attrib2buffer('aVertexPosition', glData.vertexBuffer, 4);
 						ls.attrib2buffer('aVertexColor', glData.colorBuffer, 4);
 						ls.attrib2buffer('aVertexFilter', filterBuffer !== null ? filterBuffer : glData.vertexBuffer, 2);
 						
