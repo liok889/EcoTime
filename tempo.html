@@ -68,11 +68,12 @@
 		div.spacefillingContainer {
 			margin: 0px 0px;
 			height: 700px;
+			padding: 0px 0px;
 		}
 
 		div.visSpace {
 			margin-left: 120px;
-			padding-top: 20px;
+			padding: 20px 0px 0px 0px;
 			height: 100%;
 		}
 
@@ -587,9 +588,9 @@
 		function resizeWindow()
 		{
 			// maximize div.visSpace
-			var visSpace = d3.select('div.spacefillingContainer');
-			var visSpaceBounds = visSpace.node().getBoundingClientRect();
-			visSpace.style("height", (window.innerHeight-visSpaceBounds.top-10) + 'px');
+			var container = d3.select('div.spacefillingContainer');
+			var containerBounds = container.node().getBoundingClientRect();
+			container.style("height", (window.innerHeight-containerBounds.top-30) + 'px');
 
 			var visSVG = document.getElementById('visSVG');
 			var bounding = visSVG.getBoundingClientRect();
@@ -637,6 +638,9 @@
 			
 			// add new colors
 			var currentColor = COLOR_SCALES[COLOR_SCALE_INDEX];
+			if (currentColor.length == 7) {
+				currentColor = currentColor.slice(0).splice(1, 5);
+			}
 
 			(function(theColor, palletSize, svg, w, h) 
 			{
@@ -652,10 +656,20 @@
 			})(currentColor, currentColor.length, svgColorScale, w, h);
 
 			// add a callback to svgColorScaleClick
-			svgColorScale.on("click", function() {
+			svgColorScale.on("click", function() 
+			{
 				var mouse = d3.mouse(document.body);
+				var colors = [];
+				for (var i=0; i<COLOR_SCALES.length; i++) {
+					var c = COLOR_SCALES[i].slice(0)
+					if (c.length == 7) {
+						c = c.splice(1, 5);
+					}
+					colors.push(c);
+				}
+
 				var selectionDiv = new ColorScaleSelection(
-					mouse[0], mouse[1], COLOR_SCALES, function(index, color) {
+					mouse[0], mouse[1], colors, function(index, color) {
 						COLOR_SCALE_INDEX = index;
 						populateColorScale();
 					});
