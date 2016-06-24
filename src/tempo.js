@@ -588,10 +588,10 @@ Tempo.prototype.renderGL = function()
 		this.linesShader = new Shader(gl,
 			getShader(gl, 'shader-vs-lines'),
 			getShader(gl, 'shader-fs-lines'), 
-			['aVertexPosition', 'aVertexColor', 'aVertexFilter'],
+			['aVertexPosition', 'aVertexFilter'],
 			[
 				'singleColor', 'uPMatrix', 'uMVMatrix', 'rangeMin', 'rangeLen', 'domainMin', 'domainLen',
-				'filter', 'filterMin', 'filterMax'
+				'filter', 'filterMin', 'filterMax', 'colorSource', 'colorScale'
 			]);
 	}
 
@@ -939,9 +939,11 @@ Tempo.prototype.renderGL = function()
 						gl.uniform2fv(ls.uniform('rangeLen'), new Float32Array(rangeLen));
 						gl.uniform2fv(ls.uniform('domainMin'), new Float32Array(domainMin));
 						gl.uniform2fv(ls.uniform('domainLen'), new Float32Array(domainLen));
-						
+						gl.uniform1i(ls.uniform('colorSource'), LINE_COLOR_SOURCE);
+						gl.uniform1fv(ls.uniform('colorScale'), new Float32Array(colorScaleData));
+
+
 						ls.attrib2buffer('aVertexPosition', glData.vertexBuffer, 4);
-						ls.attrib2buffer('aVertexColor', glData.colorBuffer, 4);
 						ls.attrib2buffer('aVertexFilter', filterBuffer !== null ? filterBuffer : glData.vertexBuffer, 2);
 						
 						// draw

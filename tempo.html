@@ -148,8 +148,8 @@
 					<p>&nbsp;
 					<b>color with:</b><br>
 					<input class="lineColorRadio" id="lineColorConstant" type="radio" name="lineColor" value="none">nothing<br>
-					<input class="pointColorRadio" id="lineColorTimeOfDay" type="radio" name="lineColor" value="time window" checked>time of day<br>
-					<input class="pointColorRadio" id="lineColorTimeWindow" type="radio" name="lineColor" value="time window">time window<br>
+					<input class="lineColorRadio" id="lineColorTimeOfDay" type="radio" name="lineColor" value="time window" checked>time of day<br>
+					<input class="lineColorRadio" id="lineColorTimeWindow" type="radio" name="lineColor" value="time window">time window<br>
 
 				</div>
 			</div>
@@ -225,7 +225,6 @@
 				if (any(exclude)) 
 				{
 					// not within filter
-					pointColor = vec4(COLOR, 1);
 					inFilter = false;
 				}
 				else
@@ -236,12 +235,11 @@
 					if (all(m0) && all(m1)) 
 					{
 						// ** Highlight
-						pointColor = vec4(HI_COLOR, 1.65);
+						// inFilter = true; // <-- already set
 					}
 					else
 					{
 						// not within filter
-						pointColor = vec4(COLOR, 1);
 						inFilter = false;
 					}
 				}
@@ -252,20 +250,21 @@
 				if (aVertexPosition.z >= filterMin[0] && aVertexPosition.z <= filterMax[0]) 
 				{
 					// ** Highlight
-					pointColor = vec4(HI_COLOR, 1.65);
+					// inFilter = true; // <-- already set
 				}
 				else
 				{
 					// not within filter
-					pointColor = vec4(COLOR, 1);
 					inFilter = false;
 				}
 			}
+			/*
 			else
 			{
 				// no filter; normal color
 				pointColor = vec4(COLOR, 1);
 			}
+			*/
 
 			if (renderFilter == RENDER_FILTER_IN && !inFilter) 
 			{
@@ -424,7 +423,6 @@
 	<script id="shader-vs-lines" type="x-shader/x-vertex">
 		precision mediump float;
 		attribute vec4 aVertexPosition;
-		attribute vec4 aVertexColor;   
 		attribute vec2 aVertexFilter;
 
 		uniform mat4 uMVMatrix;
@@ -434,6 +432,7 @@
 		uniform vec2 domainMin;
 		uniform vec2 domainLen;
 		uniform bool singleColor;
+		uniform int colorSource;
 
 		// filter, to be used in brushing and linking
 		uniform int filter;
@@ -448,6 +447,13 @@
 		const int FILTER_NONE = 0;
 		const int FILTER_SCATTER = 1;
 		const int FILTER_TIME = 2;
+
+		const int COLOR_CONSTANT = 0;
+		const int COLOR_TIME_OF_DAY = 1;
+		const int COLOR_TIME_WINDOW = 2;
+		
+		// color scale
+		uniform float colorScale[21];
 
 		void main(void) 
 		{
@@ -501,7 +507,23 @@
 			}
 			else
 			{
-				vColor = vec4(vec3(aVertexColor), aVertexColor.a * 0.75);
+				vec3 pointColor;
+				if (colorSource == COLOR_CONSTANT) 
+				{
+					//pointColor = vec3(0,0,0);
+					//vColor = vec4(1.0, 0.678, 0.2, 0.85);
+					vColor = vec4(0, 0, 1, 0.75);
+				}
+				else if (colorSource == COLOR_TIME_OF_DAY) 
+				{
+					//int i = 3*(int(floor(aVertexPosition.w * 7.0 + 0.5)));
+					int i = int(aVertexPosition.w)*3;
+					vColor = vec4(colorScale[i], colorScale[i+1], colorScale[i+2], 0.75);
+				}
+				else 
+				{
+					vColor = vec4(0, 0, 1, 0.75);
+				}
 			}
 		}
 	</script>
@@ -614,7 +636,6 @@
 					break;
 				}
 				tempo.setPointColorSource(source);
-				console.log("point color source: " + source);
 			});
 
 			d3.select('body').selectAll('.lineColorRadio').on("click", function() {
@@ -633,8 +654,6 @@
 					break;
 				}
 				tempo.setLineColorSource(source);
-				console.log("line color source: " + source);
-
 			});
 
 			d3.select('body')
