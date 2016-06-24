@@ -579,7 +579,7 @@ Tempo.prototype.renderGL = function()
 			['aVertexPosition', 'aVertexFilter'],
 			[	'pointOpacity', 'pointSize',
 				'uPMatrix', 'uMVMatrix', 'rangeMin', 'rangeLen', 'domainMin', 'domainLen',
-				'filter', 'filterMin', 'filterMax', 'renderFilter', 'colorSource', 'colorScale'
+				'filter', 'filterMin', 'filterMax', 'renderFilter', 'colorSource', 'colorScale', 'timeWindow'
 			]);
 	}
 
@@ -762,6 +762,7 @@ Tempo.prototype.renderGL = function()
 						gl.uniform1f(ps.uniform('pointSize'), POINT_SIZE);
 						gl.uniform1f(ps.uniform('pointOpacity'), POINT_OPACITY);
 						gl.uniform1i(ps.uniform('colorSource'), POINT_COLOR_SOURCE);
+						gl.uniform2fv(ps.uniform('timeWindow'), new Float32Array(timeRange));
 
 						// color scale
 						gl.uniform1fv(ps.uniform('colorScale'), new Float32Array(colorScaleData));

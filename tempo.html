@@ -51,7 +51,7 @@
 			overflow-y: hidden;
 		}
 		.slider {
-			font-size: 8px;
+			font-size: 7px;
 			padding-left: 10px;
 			width: 50px;
 			height: 4px;
@@ -126,12 +126,12 @@
 			<div>
 			
 				<div style="display: inline-block">
-					<input id="checkShowPoints" type="checkbox" onclick="scatterOptions()"><b>points</b><br>
+					<input id="checkShowPoints" type="checkbox" onclick="scatterOptions()"><b>Points</b><br>
 					<div class="slider" id="sliderPointSize"></div>&nbsp;&nbsp;size<br>
 					<div class="slider" id="sliderPointOpacity"></div>&nbsp;&nbsp;opacity<br>
 				
 					<p>&nbsp;
-					<b>color with:</b><br>
+					<b>color with</b><br>
 					<input class="pointColorRadio" id="pointColorConstant" type="radio" name="pointColor" value="none" checked>nothing<br>
 					<input class="pointColorRadio" id="pointColorTimeOfDay" type="radio" name="pointColor" value="time window">time of day<br>
 					<input class="pointColorRadio" id="pointColorTimeWindow" type="radio" name="pointColor" value="time window">time window<br>
@@ -146,7 +146,7 @@
 					<div id="sliderLineWidth" class="slider"></div>&nbsp;&nbsp;width<br>		
 
 					<p>&nbsp;
-					<b>color with:</b><br>
+					<b>color with</b><br>
 					<input class="lineColorRadio" id="lineColorConstant" type="radio" name="lineColor" value="none">nothing<br>
 					<input class="lineColorRadio" id="lineColorTimeOfDay" type="radio" name="lineColor" value="time window" checked>time of day<br>
 					<input class="lineColorRadio" id="lineColorTimeWindow" type="radio" name="lineColor" value="time window">time window<br>
@@ -187,6 +187,7 @@
 
 		uniform vec2 filterMin;
 		uniform vec2 filterMax;
+		uniform vec2 timeWindow;
 
 		// color of point, to pass to fragment shader
 		varying lowp vec4 pointColor;
@@ -290,12 +291,18 @@
 				else if (colorSource == COLOR_TIME_OF_DAY) 
 				{
 					//int i = 3*(int(floor(aVertexPosition.w * 7.0 + 0.5)));
-					int i = int(aVertexPosition.w)*3;
-					pointColor = vec4(colorScale[i], colorScale[i+1], colorScale[i+2], 1);
+					int cI = int(aVertexPosition.w)*3;
+					pointColor = vec4(colorScale[cI], colorScale[cI+1], colorScale[cI+2], 1);
 				}
-				else 
+				else
 				{
-					pointColor = vec4(0, 0, 1, 1);
+					float tN = (aVertexPosition.z - timeWindow[0]) / (timeWindow[1]-timeWindow[0]);
+					int cI = int(floor(tN*7.0));
+					if (cI > 6) {
+						cI = 6;
+					}
+					cI *= 3;
+					pointColor = vec4(colorScale[cI], colorScale[cI+1], colorScale[cI+2], 1);	
 				}
 			}
 
