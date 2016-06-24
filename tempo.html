@@ -628,7 +628,21 @@
 
 		function populateColorScale()
 		{
-			
+			function identical(arr1, arr2) {
+				if (arr1.length != arr2.length) {
+					return false;
+				}
+				else
+				{
+					for (var i=0; i<arr1.length; i++) {
+						if (arr1[i] !== arr2[i]) {
+							return false;
+						}
+					}
+					return true;
+				}
+			}
+
 			var svgColorScale = d3.select("#svgColorScale");
 			var w = +svgColorScale.attr("width");
 			var h = +svgColorScale.attr("height");
@@ -639,7 +653,9 @@
 			// add new colors
 			var currentColor = COLOR_SCALES[COLOR_SCALE_INDEX];
 			if (currentColor.length == 7) {
-				currentColor = currentColor.slice(0).splice(1, 5);
+				if (identical(currentColor[0], currentColor[1]) && identical(currentColor[5], currentColor[6])) {
+					currentColor = currentColor.slice(0).splice(1, 5);
+				}
 			}
 
 			(function(theColor, palletSize, svg, w, h) 
@@ -663,7 +679,10 @@
 				for (var i=0; i<COLOR_SCALES.length; i++) {
 					var c = COLOR_SCALES[i].slice(0)
 					if (c.length == 7) {
-						c = c.splice(1, 5);
+						if (identical(c[0], c[1]) && identical(c[5], c[6])) 
+						{
+							c = c.splice(1, 5);
+						}
 					}
 					colors.push(c);
 				}

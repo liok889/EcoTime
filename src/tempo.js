@@ -188,7 +188,8 @@ var COLOR_SCALES = [
 		'rgb(215,25,28)',
 		'rgb(215,25,28)',
 		'rgb(253,174,97)',
-		'rgb(255,255,191)',
+		//'rgb(255,255,191)',
+		'rgb(80, 80, 80)',
 		'rgb(171,221,164)',
 		'rgb(43,131,186)',
 		'rgb(43,131,186)'
@@ -205,7 +206,9 @@ var COLOR_SCALES = [
 	].reverse(),
 
 	['rgb(208,28,139)', 'rgb(208,28,139)','rgb(241,182,218)','rgb(70,70,70)','rgb(184,225,134)','rgb(77,172,38)', 'rgb(77,172,38)'].reverse(),
-	['rgb(230,97,1)', 'rgb(230,97,1)','rgb(253,184,99)','rgb(80,80,80)','rgb(178,171,210)','rgb(94,60,153)', 'rgb(94,60,153)'].reverse()
+	['rgb(230,97,1)', 'rgb(230,97,1)','rgb(253,184,99)','rgb(80,80,80)','rgb(178,171,210)','rgb(94,60,153)', 'rgb(94,60,153)'].reverse(),
+	['rgb(255,255,178)','rgb(254,217,118)','rgb(254,178,76)','rgb(253,141,60)','rgb(252,78,42)','rgb(227,26,28)','rgb(177,0,38)'],
+	['rgb(255,255,204)','rgb(199,233,180)','rgb(127,205,187)','rgb(65,182,196)','rgb(29,145,192)','rgb(34,94,168)','rgb(12,44,132)']
 ];
 var COLOR_SCALE_INDEX = 0;
 
@@ -985,8 +988,10 @@ Tempo.prototype.renderGL = function()
 						ls.attrib2buffer('aVertexFilter', filterBuffer !== null ? filterBuffer : glData.vertexBuffer, 2);
 						
 						// draw
+						/*
 						gl.uniform1i(ls.uniform('singleColor'), 1);
 						gl.drawArrays(gl.LINE_STRIP, i0, drawLen);
+						*/
 
 						gl.uniform1i(ls.uniform('singleColor'), 0);
 						gl.drawArrays(gl.LINE_STRIP, i0, drawLen);
