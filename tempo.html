@@ -195,6 +195,7 @@
 		// color of points
 		const vec3 COLOR = vec3(0.15);
 		const vec3 HI_COLOR = vec3(0.702*1.1, 0, 0);
+		//const vec3 HI_COLOR = mix(vec3(0,0,0), 1.1*vec3(1.0, 0.678, 0.2), 0.9);
 
 		// type of filter
 		const int FILTER_NONE = 0;
@@ -445,6 +446,7 @@
 		uniform int filter;
 		uniform vec2 filterMin;
 		uniform vec2 filterMax;
+		uniform vec2 timeWindow;
 
 		// color
 		varying lowp vec4 vColor;
@@ -529,7 +531,13 @@
 				}
 				else 
 				{
-					vColor = vec4(0, 0, 1, 0.75);
+					float tN = (aVertexPosition.z - timeWindow[0]) / (timeWindow[1]-timeWindow[0]);
+					int cI = int(floor(tN*7.0));
+					if (cI > 6) {
+						cI = 6;
+					}
+					cI *= 3;
+					vColor = vec4(colorScale[cI], colorScale[cI+1], colorScale[cI+2], 0.75);
 				}
 			}
 		}
