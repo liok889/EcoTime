@@ -150,8 +150,12 @@
 					<input class="lineColorRadio" id="lineColorConstant" type="radio" name="lineColor" value="none">nothing<br>
 					<input class="lineColorRadio" id="lineColorTimeOfDay" type="radio" name="lineColor" value="time window" checked>time of day<br>
 					<input class="lineColorRadio" id="lineColorTimeWindow" type="radio" name="lineColor" value="time window">time window<br>
-
 				</div>
+			</div>
+
+			<div style="margin-top: 15px">
+				<b>Color scale</b>
+				<svg id="svgColorScale" width="80" height="10" style="border: solid 1px #cccccc"></svg>
 			</div>
 		</div>
 
@@ -194,8 +198,9 @@
 
 		// color of points
 		const vec3 COLOR = vec3(0.15);
-		const vec3 HI_COLOR = vec3(0.702*1.1, 0, 0);
+		//const vec3 HI_COLOR = mix(vec3(1), vec3(0.702*1.1, 0, 0), 0.92);
 		//const vec3 HI_COLOR = mix(vec3(0,0,0), 1.1*vec3(1.0, 0.678, 0.2), 0.9);
+		const vec3 HI_COLOR = vec3(0, 0, 1);
 
 		// type of filter
 		const int FILTER_NONE = 0;
@@ -281,7 +286,7 @@
 
 			// color
 			if (inFilter && filter != FILTER_NONE) {
-				pointColor = vec4(HI_COLOR, 1.65);
+				pointColor = vec4(HI_COLOR, 1.85);
 			}
 			else 
 			{
@@ -417,7 +422,8 @@
 	</script>
 	<script id="shader-fs-timeline-brush" type="x-shader/x-fragment">
 		precision mediump float;
-		const vec3 HI_COLOR = vec3(0.702*1.1, 0, 0);
+		//const vec3 HI_COLOR = vec3(0.702*1.1, 0, 0);
+		const vec3 HI_COLOR = vec3(0, 0, 1);
 
 		void main() 
 		{
@@ -619,6 +625,47 @@
 		}
 		window.onresize = resizeWindow;
 
+		function populateColorScale()
+		{
+			
+			var svgColorScale = d3.select("#svgColorScale");
+			var w = +svgColorScale.attr("width");
+			var h = +svgColorScale.attr("height");
+
+			// clear
+			svgColorScale.selectAll("rect").remove();
+			
+			// add new colors
+			var currentColor = COLOR_SCALES[COLOR_SCALE_INDEX];
+
+			(function(theColor, palletSize, svg, w, h) 
+			{
+				svg.selectAll("rect").data(theColor).enter().append("rect")
+					.attr("width", w / palletSize)
+					.attr("height", h)
+					.attr("x", function(d, i) { return i*w / palletSize; })
+					.style("stroke", "none")
+					.style("fill", function(d) { 
+						return 'rgb(' + d[0] + ',' + d[1] + ',' + d[2] + ')';
+					});
+
+			})(currentColor, currentColor.length, svgColorScale, w, h);
+
+			// add a callback to svgColorScaleClick
+			svgColorScale.on("click", function() {
+				var mouse = d3.mouse(document.body);
+				var selectionDiv = new ColorScaleSelection(
+					mouse[0], mouse[1], COLOR_SCALES, function(index, color) {
+						COLOR_SCALE_INDEX = index;
+						populateColorScale();
+					});
+			});
+
+			if (tempo) {
+				tempo.renderGL();
+			}
+		}
+
 		function initUI()
 		{
 			resizeWindow();
@@ -715,6 +762,7 @@
 				}
 			});
 
+			populateColorScale();
 		}
 
 		// fire up things
@@ -728,8 +776,6 @@
 
 			// initialize the vis
 			tempo = new Tempo();
-
-
 		}
 		
 	</script>

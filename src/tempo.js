@@ -182,9 +182,45 @@ var COLOR_SCALES = [
 		[103,169,207],
 		[33,102,172],
 		[33,102,172]
-	].reverse()
+	].reverse(),
+
+	[
+		'rgb(215,25,28)',
+		'rgb(215,25,28)',
+		'rgb(253,174,97)',
+		'rgb(255,255,191)',
+		'rgb(171,221,164)',
+		'rgb(43,131,186)',
+		'rgb(43,131,186)'
+	].reverse(),
+
+	[
+		'rgb(166,97,26)',
+		'rgb(166,97,26)',
+		'rgb(223,194,125)',
+		'rgb(70,70,70)',
+		'rgb(128,205,193)',
+		'rgb(1,133,113)',
+		'rgb(1,133,113)'
+	].reverse(),
+
+	['rgb(208,28,139)', 'rgb(208,28,139)','rgb(241,182,218)','rgb(70,70,70)','rgb(184,225,134)','rgb(77,172,38)', 'rgb(77,172,38)'].reverse(),
+	['rgb(230,97,1)', 'rgb(230,97,1)','rgb(253,184,99)','rgb(80,80,80)','rgb(178,171,210)','rgb(94,60,153)', 'rgb(94,60,153)'].reverse()
 ];
 var COLOR_SCALE_INDEX = 0;
+
+// format color scales
+for (var i=0; i<COLOR_SCALES.length; i++) {
+	var aColor = COLOR_SCALES[i];
+	for (var j=0; j<aColor.length; j++) {
+		var component = aColor[j];
+		if (!Array.isArray(component)) {
+			
+			var dc = d3.rgb(component);
+			aColor[j] = [dc.r, dc.g, dc.b];
+		}
+	}
+}
 
 function connectSliderToColumn(ribbon, slider, column)
 {
