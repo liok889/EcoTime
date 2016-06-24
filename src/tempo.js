@@ -50,6 +50,15 @@ var RENDER_FILTER_OUT = 2;
 
 var TIMELINE_BRUSH_THICKNESS = 4;
 
+
+// color source
+var COLOR_CONSTANT = 0;
+var COLOR_TIME_OF_DAY = 1;
+var COLOR_TIME_WINDOW = 2;
+
+var POINT_COLOR_SOURCE = COLOR_CONSTANT;
+var LINE_COLOR_SOURCE = COLOR_TIME_OF_DAY;
+
 function Tempo()
 {
 	this.vis = d3.select("#visSVG");
@@ -163,6 +172,58 @@ var SLIDER_COLORS = [
 var SLIDER_DEFAULT_COLOR = "#cccccc";
 
 
+// color scales
+var COLOR_SCALES = [
+	[
+		[178,24,43],
+		[178,24,43],
+		[239,138,98],
+		[70, 70, 70],
+		[103,169,207],
+		[33,102,172],
+		[33,102,172]
+	].reverse(),
+
+	[
+		'rgb(215,25,28)',
+		'rgb(215,25,28)',
+		'rgb(253,174,97)',
+		//'rgb(255,255,191)',
+		'rgb(80, 80, 80)',
+		'rgb(171,221,164)',
+		'rgb(43,131,186)',
+		'rgb(43,131,186)'
+	].reverse(),
+
+	[
+		'rgb(166,97,26)',
+		'rgb(166,97,26)',
+		'rgb(223,194,125)',
+		'rgb(70,70,70)',
+		'rgb(128,205,193)',
+		'rgb(1,133,113)',
+		'rgb(1,133,113)'
+	].reverse(),
+
+	['rgb(208,28,139)', 'rgb(208,28,139)','rgb(241,182,218)','rgb(70,70,70)','rgb(184,225,134)','rgb(77,172,38)', 'rgb(77,172,38)'].reverse(),
+	['rgb(230,97,1)', 'rgb(230,97,1)','rgb(253,184,99)','rgb(80,80,80)','rgb(178,171,210)','rgb(94,60,153)', 'rgb(94,60,153)'].reverse(),
+	['rgb(255,255,178)','rgb(254,217,118)','rgb(254,178,76)','rgb(253,141,60)','rgb(252,78,42)','rgb(227,26,28)','rgb(177,0,38)'],
+	['rgb(255,255,204)','rgb(199,233,180)','rgb(127,205,187)','rgb(65,182,196)','rgb(29,145,192)','rgb(34,94,168)','rgb(12,44,132)']
+];
+var COLOR_SCALE_INDEX = 0;
+
+// format color scales
+for (var i=0; i<COLOR_SCALES.length; i++) {
+	var aColor = COLOR_SCALES[i];
+	for (var j=0; j<aColor.length; j++) {
+		var component = aColor[j];
+		if (!Array.isArray(component)) {
+			
+			var dc = d3.rgb(component);
+			aColor[j] = [dc.r, dc.g, dc.b];
+		}
+	}
+}
 
 function connectSliderToColumn(ribbon, slider, column)
 {
@@ -503,6 +564,26 @@ Tempo.prototype.startBrush = function(instigator)
 	}
 }
 
+Tempo.prototype.setPointColorSource = function(colorSource)
+{
+	POINT_COLOR_SOURCE = colorSource
+	this.renderGL();
+}
+Tempo.prototype.getPointColorSource = function()
+{
+	return POINT_COLOR_SOURCE;
+}
+Tempo.prototype.setLineColorSource = function(colorSource)
+{
+	LINE_COLOR_SOURCE = colorSource
+	this.renderGL();
+}
+Tempo.prototype.getLineColorSource = function()
+{
+	return LINE_COLOR_SOURCE;
+}
+
+
 Tempo.prototype.renderGL = function()
 {
 	// initialize the shader
@@ -537,7 +618,7 @@ Tempo.prototype.renderGL = function()
 			['aVertexPosition', 'aVertexFilter'],
 			[	'pointOpacity', 'pointSize',
 				'uPMatrix', 'uMVMatrix', 'rangeMin', 'rangeLen', 'domainMin', 'domainLen',
-				'filter', 'filterMin', 'filterMax', 'renderFilter'
+				'filter', 'filterMin', 'filterMax', 'renderFilter', 'colorSource', 'colorScale', 'timeWindow'
 			]);
 	}
 
@@ -546,13 +627,14 @@ Tempo.prototype.renderGL = function()
 		this.linesShader = new Shader(gl,
 			getShader(gl, 'shader-vs-lines'),
 			getShader(gl, 'shader-fs-lines'), 
-			['aVertexPosition', 'aVertexColor', 'aVertexFilter'],
+			['aVertexPosition', 'aVertexFilter'],
 			[
 				'singleColor', 'uPMatrix', 'uMVMatrix', 'rangeMin', 'rangeLen', 'domainMin', 'domainLen',
-				'filter', 'filterMin', 'filterMax'
+				'filter', 'filterMin', 'filterMax', 'colorSource', 'colorScale', 'timeWindow'
 			]);
 	}
 
+	/*
 	if (!this.scatterDumpShader)
 	{
 		this.scatterDumpShader = new Shader(gl,
@@ -565,6 +647,7 @@ Tempo.prototype.renderGL = function()
 				'rangeMin', 'rangeLen'
 			]);
 	}
+	*/
 
 	if (!this.timelineBrushShader)
 	{
@@ -578,6 +661,19 @@ Tempo.prototype.renderGL = function()
 				'rangeMin', 'rangeLen'
 			]);		
 	}
+
+	// prepare color scale array
+	var rgbScale = COLOR_SCALES[ COLOR_SCALE_INDEX ];
+	var colorScaleData = [];
+	for (var i=0; i<rgbScale.length; i++) 
+	{
+		var c = rgbScale[i];
+		for (var j=0; j<3; j++) 
+		{
+			colorScaleData.push( c[j] / 255 );
+		}
+	}
+
 
 	// clear
 	gl.clear(gl.COLOR_BUFFER_BIT);
@@ -704,6 +800,11 @@ Tempo.prototype.renderGL = function()
 						gl.uniform2fv(ps.uniform('domainLen'), new Float32Array(domainLen));
 						gl.uniform1f(ps.uniform('pointSize'), POINT_SIZE);
 						gl.uniform1f(ps.uniform('pointOpacity'), POINT_OPACITY);
+						gl.uniform1i(ps.uniform('colorSource'), POINT_COLOR_SOURCE);
+						gl.uniform2fv(ps.uniform('timeWindow'), new Float32Array(timeRange));
+
+						// color scale
+						gl.uniform1fv(ps.uniform('colorScale'), new Float32Array(colorScaleData));
 						
 						// only apply point filter (i.e., brushing) if we're not showing lines
 						// otherwise the color of the brushed points intefers with line perception
@@ -728,7 +829,7 @@ Tempo.prototype.renderGL = function()
 							gl.uniform2fv(ps.uniform('filterMax'), new Float32Array(filterMax));
 						}
 						
-						ps.attrib2buffer('aVertexPosition', glData.vertexBuffer, 3);
+						ps.attrib2buffer('aVertexPosition', glData.vertexBuffer, 4);
 						ps.attrib2buffer('aVertexFilter', filterBuffer !== null ? filterBuffer : glData.vertexBuffer, 2);
 
 						// draw
@@ -767,7 +868,7 @@ Tempo.prototype.renderGL = function()
 						gl.uniform2fv(tl.uniform('filterMin'), new Float32Array(filterMin));
 						gl.uniform2fv(tl.uniform('filterMax'), new Float32Array(filterMax));
 							
-						tl.attrib2buffer('aVertexPosition', glData.vertexBuffer, 3);
+						tl.attrib2buffer('aVertexPosition', glData.vertexBuffer, 4);
 						tl.attrib2buffer('aVertexFilter', filterBuffer !== null ? filterBuffer : glData.vertexBuffer, 2);
 
 						gl.uniformMatrix4fv(tl.uniform('uPMatrix'), false, new Float32Array(projectionMatrix.flatten()));
@@ -878,14 +979,19 @@ Tempo.prototype.renderGL = function()
 						gl.uniform2fv(ls.uniform('rangeLen'), new Float32Array(rangeLen));
 						gl.uniform2fv(ls.uniform('domainMin'), new Float32Array(domainMin));
 						gl.uniform2fv(ls.uniform('domainLen'), new Float32Array(domainLen));
-						
-						ls.attrib2buffer('aVertexPosition', glData.vertexBuffer, 3);
-						ls.attrib2buffer('aVertexColor', glData.colorBuffer, 4);
+						gl.uniform1i(ls.uniform('colorSource'), LINE_COLOR_SOURCE);
+						gl.uniform1fv(ls.uniform('colorScale'), new Float32Array(colorScaleData));
+						gl.uniform2fv(ls.uniform('timeWindow'), new Float32Array(timeRange));
+
+
+						ls.attrib2buffer('aVertexPosition', glData.vertexBuffer, 4);
 						ls.attrib2buffer('aVertexFilter', filterBuffer !== null ? filterBuffer : glData.vertexBuffer, 2);
 						
 						// draw
+						/*
 						gl.uniform1i(ls.uniform('singleColor'), 1);
 						gl.drawArrays(gl.LINE_STRIP, i0, drawLen);
+						*/
 
 						gl.uniform1i(ls.uniform('singleColor'), 0);
 						gl.drawArrays(gl.LINE_STRIP, i0, drawLen);

@@ -870,15 +870,20 @@ function getPairedTimeseries(xVar, yVar, xFilter, yFilter)
 					var timestep = new Date(beginTime + i*timestepOffset);
 					var dayOffset = timestep.getHours() * 60*60*1000 + timestep.getMinutes() * 60*1000;
 					var dayOffsetN = dayOffset / (24*60*60*1000-1);
+
+					// add the day offset
+					var colorIndex = colorScale(dayOffsetN);
+					vertices.push( colorIndex );
 					
 					// map to color
-					var color = COLOR_SCALE[colorScale(dayOffsetN)];
-
+					/*
+					var color = COLOR_SCALE[ colorIndex ];
 					colors.push( color[0]/255 );
 					colors.push( color[1]/255 );
 					colors.push( color[2]/255 );
 					colors.push(      1.0     );
-				
+					*/
+					
 					indices.push(vertexCount);
 					lastIndex = vertexCount;
 					vertexCount++;
@@ -896,9 +901,11 @@ function getPairedTimeseries(xVar, yVar, xFilter, yFilter)
 			gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
 			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
 
+			/*
 			var colorBuffer = gl.createBuffer();
 			gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
 			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
+			*/
 
 			// normalize the timeseries
 			ts1.normalize();
@@ -906,7 +913,7 @@ function getPairedTimeseries(xVar, yVar, xFilter, yFilter)
 
 			glData = {
 				vertexBuffer: vertexBuffer,
-				colorBuffer: colorBuffer,
+				//colorBuffer: colorBuffer,
 				indices: indices,
 				vertexCount: vertexCount,
 				xSeries: ts1,

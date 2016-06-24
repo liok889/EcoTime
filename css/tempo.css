@@ -23,7 +23,7 @@ rect.scatterBorderRect {
 .variableName 
 {
 	font-family: 'Anonymous Pro', sans-serif;
-	fill: #cccccc;
+	fill: #888888;
 	cursor: pointer;
 }
 
@@ -81,7 +81,9 @@ rect.scatterBorderRect {
 }
 
 .yLinechart {
-	stroke: #002db3;
+	/*stroke: #002db3; navy blue */
+	stroke: #990099; /* purple */
+
 	/* slightly lighter shade of red #d6604d */
 }
 
