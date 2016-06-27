@@ -193,6 +193,7 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height, linechartH,
 			.on("brush", function() {
 				scatterview.doLinechartBrush();
 			});
+
 	})(this)
 
 	this.linechartGroup.append("g")
@@ -202,6 +203,42 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height, linechartH,
 			.call(this.linechartBrush)
 			.selectAll('rect')
 				.attr('y', -LINECHART_PAD_H).attr('height', this.linechartH);
+
+	// zoom behavior
+	this.linechartScale = d3.scale.linear().domain([0, 1]).range([0, this.w-LINECHART_PAD_W*2]);
+	this.linechartZoom = d3.behavior.zoom()
+		.scaleExtent([1, 99])
+		.x(this.linechartScale);
+	(function(scatterview) 
+	{
+		var x = scatterview.linechartScale;
+		var zoom = scatterview.linechartZoom;
+
+		zoom.on("zoom", function() {
+			if (scatterview.zoomCallback) {
+				scatterview.zoomCallback();
+			}
+
+			// limit translate
+			if (x.domain()[0] < 0) {
+				zoom.translate([zoom.translate()[0] - x(0) + x.range()[0], zoom.translate()[1]]);
+			} else if (x.domain()[1] > 1) {
+				zoom.translate([zoom.translate()[0] - x(1) + x.range()[1], zoom.translate()[1]]);
+			}
+
+			scatterview.updateLinechartTransform();
+
+		})
+	})(this);
+	this.linechartGroup.append("g")
+		.attr('transform', 'translate(' + LINECHART_PAD_W + ',' + LINECHART_PAD_H + ')')
+		.append("rect")
+			.attr('class', 'zoomRect')
+			.attr("width", this.w-LINECHART_PAD_W*2)
+			.attr("height", this.linechartH-LINECHART_PAD_H*2)
+			.style("fill-opacity", "0.0").style("stroke", "none").style("fill", 'white')
+			.call(this.linechartZoom);
+
 
 	// data group
 	var linechartData = this.linechartContent.append("g")
@@ -523,6 +560,14 @@ ScatterView.prototype.updateSize = function(w, h)
 		.attr("height", this.linechartH - LINECHART_PAD_H*2)
 		.attr("x", LINECHART_PAD_W).attr("y", LINECHART_PAD_H);
 
+	// zoom behavior
+	this.linechartScale.range([0, this.w-LINECHART_PAD_W*2]);
+	this.linechartZoom.x(this.linechartScale);
+	this.linechartGroup.selectAll("rect.zoomRect")
+		.attr("width", this.w - LINECHART_PAD_W*2)
+		.attr("height", this.linechartH - LINECHART_PAD_H*2)
+		.call(this.linechartZoom);
+
 	// update line chart
 	this.updateLinechart();
 
@@ -733,39 +778,27 @@ ScatterView.prototype.updateLinechart = function(forceUpdate)
 		}
 	}
 
-	// update the transform
-	/*
-	var xScaleFactor = (this.w - LINECHART_PAD_W*2) / (this.timeRange[1]-this.timeRange[0]);
-	var xTranslate = -this.timeRange[0];
-
-	var yScaleFactor = this.linechartH - LINECHART_PAD_H*2
-	var yTranslate = 0;
-
-	var transform = 	
-		'translate(' + LINECHART_PAD_W + ',' + LINECHART_PAD_H + ') ' +
-		'scale(' + xScaleFactor + ',' + yScaleFactor + ') '	+
-		'translate(' + xTranslate + ',' + yTranslate + ')';
-
-	this.linechartContent.select("g.linechartData")
-		.attr("transform", transform);
-	*/
 	this.updateLinechartTransform();
-
 }
 
 ScatterView.prototype.updateLinechartTransform = function(transition)
 {
 	var transform1, transform2;
+	var scale = this.linechartScale.domain();
+	var zoomScale = 1/(scale[1]-scale[0]);
+	var zoomTranslate = -1*scale[0] * (this.linechartW - LINECHART_PAD_W*2);
+
+	var xScaleFactor = (this.w - LINECHART_PAD_W*2) / (this.timeRange[1]-this.timeRange[0]);
+	var xTranslate = -this.timeRange[0];
 
 	if (this.linechartMode == LINECHART_MODE_ONE)
 	{
-		var xScaleFactor = (this.w - LINECHART_PAD_W*2) / (this.timeRange[1]-this.timeRange[0]);
-		var xTranslate = -this.timeRange[0];
-
 		var yScaleFactor = this.linechartH - LINECHART_PAD_H*2
 		var yTranslate = 0;
 
-		var transform = 	
+		var transform = 
+			'translate(' + zoomScale*zoomTranslate + ',0) ' +
+			'scale(' + zoomScale + ',1) ' +
 			'translate(' + LINECHART_PAD_W + ',' + LINECHART_PAD_H + ') ' +
 			'scale(' + xScaleFactor + ',' + yScaleFactor + ') '	+
 			'translate(' + xTranslate + ',' + yTranslate + ')';
@@ -775,18 +808,19 @@ ScatterView.prototype.updateLinechartTransform = function(transition)
 	}
 	else
 	{
-		var xScaleFactor = (this.w - LINECHART_PAD_W*2) / (this.timeRange[1]-this.timeRange[0]);
-		var xTranslate = -this.timeRange[0];
-
 		var yScaleFactor = (this.linechartH - LINECHART_PAD_H*2)/2 - 1
 		var yTranslate = 0;
 
 		transform1 = 	
+			'translate(' + zoomScale*zoomTranslate + ',0) ' +
+			'scale(' + zoomScale + ',1) ' +
 			'translate(' + LINECHART_PAD_W + ',' + LINECHART_PAD_H + ') ' +
 			'scale(' + xScaleFactor + ',' + yScaleFactor + ') '	+
 			'translate(' + xTranslate + ',' + yTranslate + ')';
 
 		transform2 =
+			'translate(' + zoomScale*zoomTranslate + ',0) ' +
+			'scale(' + zoomScale + ',1) ' +
 			'translate(' + LINECHART_PAD_W + ',' + (LINECHART_PAD_H + yScaleFactor + 1) + ') ' +
 			'scale(' + xScaleFactor + ',' + yScaleFactor + ') '	+
 			'translate(' + xTranslate + ',' + yTranslate + ')';
