@@ -102,3 +102,86 @@ Timeseries.prototype.getSeries = function()
 {
 	return this.series;
 }
+
+Timeseries.prototype.smooth = function(windowSize)
+{
+	// window size must be odd
+	if (windowSize % 2 == 0) { windowSize++; }
+
+	// make sure the size of the series is longer than the proposed smoothing window
+	if (this.series.length < windowSize) {
+		return;
+	}
+
+	var series = this.series, smoothed = [];
+	var e = [Number.MAX_VALUE, -Number.MAX_VALUE];	// new extents
+	var halfWindowSize = Math.floor(windowSize / 2);
+
+	// calculate initial window
+	var winSum = 0, winCount = 0;
+	for (var i=0; i<windowSize; i++) 
+	{
+		val = series[i]
+		winSum +=	(val !== null ? val : 0);
+		winCount +=	(val !== null ? 1 : 0);
+
+		if (i < halfWindowSize) 
+		{
+			smoothed.push(val);
+			if (val !== null) {
+				// keep track of min/max
+				if (val < e[0]) e[0] = val;
+				if (val > e[1]) e[1] = val;	
+			}
+		}
+	}
+
+	for (var i=halfWindowSize, N=series.length-halfWindowSize; i<N; i++) 
+	{
+		if (winCount == 0) 
+		{
+			smoothed.push(null);
+		}
+		else
+		{
+			var smoothedVal = winSum / winCount;
+			smoothed.push(winSum / winCount);
+
+			// keep track of min/max
+			if (smoothedVal < e[0]) e[0] = smoothedVal;
+			if (smoothedVal > e[1]) e[1] = smoothedVal;
+
+		}
+
+		// update running window
+		var outVal = series[i-halfWindowSize];
+		var inVal = series[i+halfWindowSize+1];
+		
+		// subtract value out of window
+		winSum -= outVal !== null ? outVal : 0;
+		winCount -= outVal !== null ? 1 : 0;
+		
+		// add value that's going to be in window
+		winSum += inVal !== null ? inVal : 0;
+		winCount += inVal !== null ? 1 : 0;
+	}
+	
+	// add remaining windows
+	for (var i=series.length-halfWindowSize, N=series.length; i<N; i++) 
+	{
+		var val = series[i];
+		smoothed.push(val);
+
+		if (val !== null) {
+			// keep track of min/max
+			if (val < e[0]) e[0] = val;
+			if (val > e[1]) e[1] = val;			
+		}
+	}
+
+	this.series = smoothed;
+	this.extents = e;
+
+}	
+
+
