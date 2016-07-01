@@ -10,6 +10,15 @@ function Timeseries(N)
 	}
 }
 
+Timeseries.prototype.clone = function()
+{
+	var ts = new Timeseries();
+	ts.series = this.series.slice(0);
+	ts.extents = this.extents ? [this.extents[0], this.extents[1]] : this.extents;
+	ts.originalExtents = this.originalExtents ? [this.originalExtents[0], this.originalExtents[1]] : this.originalExtents;
+	return ts;
+}
+
 Timeseries.prototype.size = function()
 {
 	return this.series.length;
@@ -181,7 +190,7 @@ Timeseries.prototype.smooth = function(windowSize)
 
 	this.series = smoothed;
 	this.extents = e;
-
+	return this;
 }	
 
 
