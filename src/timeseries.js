@@ -112,7 +112,35 @@ Timeseries.prototype.getSeries = function()
 	return this.series;
 }
 
-Timeseries.prototype.smooth = function(windowSize)
+Timeseries.prototype.zero = function()
+{
+	for (var i=0, N=this.series.length; i<N; i++) {
+		this.series[i] = 0;
+	}
+	this.extents = [0,0];
+	return this;
+}
+
+Timeseries.prototype.cosineWave = function(amplitude, waveLength, phase)
+{
+	for (var i=0, N=this.series.length; i<N; i++) {
+		this.series[i] += amplitude * Math.cos( 2*Math.PI * ((i+phase)/waveLength)  );
+	}
+	this.extents = undefined;
+	return this;
+}
+
+Timeseries.prototype.noise = function(range)
+{
+	var rangeLen = range[1] - range[0]
+	for (var i=0, N=this.series.length; i<N; i++) {
+		this.series[i] += rangeLen * Math.random() + range[0];
+	}
+	this.extents = undefined;
+	return this;
+}
+
+Timeseries.prototype.smooth = function(windowSize, nullifyBoundaries)
 {
 	// window size must be odd
 	if (windowSize % 2 == 0) { windowSize++; }
@@ -136,6 +164,7 @@ Timeseries.prototype.smooth = function(windowSize)
 
 		if (i < halfWindowSize) 
 		{
+			if (nullifyBoundaries) val = null;
 			smoothed.push(val);
 			if (val !== null) {
 				// keep track of min/max
@@ -179,6 +208,7 @@ Timeseries.prototype.smooth = function(windowSize)
 	for (var i=series.length-halfWindowSize, N=series.length; i<N; i++) 
 	{
 		var val = series[i];
+		if (nullifyBoundaries) val = null;
 		smoothed.push(val);
 
 		if (val !== null) {
@@ -191,6 +221,25 @@ Timeseries.prototype.smooth = function(windowSize)
 	this.series = smoothed;
 	this.extents = e;
 	return this;
-}	
+}
 
+Timeseries.prototype.calcMean = function()
+{
+	var mean = 0, count = 0;
+
+	for (var i=0, N=this.series.length; i<N; i++) {
+		var v = this.series[i];
+		if (v !== null && v !== undefined) {
+			mean += v;
+			count++;
+		}
+	}
+	if (count > 0) {
+		return mean/count;
+	}
+	else
+	{
+		return 0;
+	}
+}
 

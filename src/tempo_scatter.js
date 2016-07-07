@@ -34,6 +34,7 @@ var DEF_LINECHART_MODE = LINECHART_MODE_ONE;
 
 // counter of views
 var SCATTER_ID = 0;
+var COLLAPSED_HEIGHT = 10;
 
 function ScatterView(parentColumn, group, xVar, yVar, width, height, linechartH, linechartVisibility)
 {
@@ -244,6 +245,10 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height, linechartH,
 		'assets/linechart.png'
 	);
 
+	this.collapseButton = new InlineButton(
+		this.group,
+		1, 1, BUTTON_SIZE, BUTTON_SIZE, 'assets/show-less-fold-button.png'
+	);
 
 	(function(scatterview) 
 	{
@@ -282,9 +287,68 @@ function ScatterView(parentColumn, group, xVar, yVar, width, height, linechartH,
 			}
 		})
 
+		scatterview.collapseButton.on('click', function() 
+		{
+			if (scatterview.linechartVisibility) {
+				scatterview.column.initiateToggleLinechartView(scatterview, function() {
+					tempo.toggleCollapseExpand(scatterview.matrixIndex[1]);
+				});
+			}
+			else
+			{
+				tempo.toggleCollapseExpand(scatterview.matrixIndex[1]);
+			}
+		});
+
 	})(this);
 }
 
+ScatterView.prototype.collapse_expand = function(startCallback, endCallback, duration)
+{
+	var newHeight;
+	if (this.collapsed) {
+		newHeight = this.oldHeight;
+		this.collapsed = false;
+	}
+	else
+	{
+		this.oldHeight = this.h;
+		newHeight = COLLAPSED_HEIGHT;
+		this.collapsed = true;
+		this.yVarText.style('visibility', 'hidden');
+		this.resizeScatter.visible(false);
+		this.resizeLinechart.visible(false);
+		this.linechartModeButton.visible(false);
+	}
+
+	// new height
+	this.h = newHeight;
+
+	(function(scatterview, start, end) 
+	{
+		scatterview.bgRect.transition()
+			.duration(duration !== undefined ? duration : EXPAND_DURATION)
+			.attr("height", scatterview.h)
+			.each("start", function() {
+				if (start) {
+					start();
+				}
+			})
+			.each("end", function() {
+				if (end) {
+					end();
+				}
+				scatterview.updateSize(scatterview.w);
+				if (!scatterview.collapsed) 
+				{
+					scatterview.yVarText.style('visibility', 'visible');
+					scatterview.resizeScatter.visible(true);
+					scatterview.resizeLinechart.visible(true);
+					scatterview.linechartModeButton.visible(true);
+				}
+			});
+	})(this, startCallback, endCallback);
+}
 ScatterView.prototype.doLinechartBrush = function()
 {
 	var brush = this.linechartBrush;
@@ -648,9 +712,13 @@ ScatterView.prototype.getCurrentH = function()
 {
 	var attrH = this.linechartRect.attr("height")
 	var linechartH = isNaN(attrH) ? 0 : +attrH;
-	return this.h + linechartH;
+	return +(this.bgRect.attr('height')) + linechartH;
 }
 
+ScatterView.prototype.isCollapsed = function()
+{
+	return this.collapsed == true;
+}
 ScatterView.prototype.getH = function()
 {
 	var height = this.h + (this.linechartVisibility ? this.linechartH : 0);
@@ -661,6 +729,11 @@ ScatterView.prototype.getScatterH = function()
 {
 	return this.h;
 }
+ScatterView.prototype.getCurrentScatterH = function()
+{
+	return +(this.bgRect.attr('height'));
+}
+
 ScatterView.prototype.getLinechartH = function()
 {
 	return this.linechartH;

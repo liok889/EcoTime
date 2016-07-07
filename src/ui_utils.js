@@ -113,6 +113,7 @@ InlineButton.prototype.on = function(event, callback)
 	{
 		if (event == 'resize')
 		{
+
 			button.on("mousedown", function() {
 				thisObject.dragOn();
 				thisObject.lastMouse = d3.mouse(button.node());

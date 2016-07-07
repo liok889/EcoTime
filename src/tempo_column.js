@@ -112,7 +112,7 @@ TimeColumn.prototype.updateScatterSize = function(instigator, newW, newH)
 }
 
 
-TimeColumn.prototype.initiateToggleLinechartView = function(view)
+TimeColumn.prototype.initiateToggleLinechartView = function(view, endCallback)
 {
 	// identify the view index
 	var viewIndex = -1;
@@ -123,26 +123,37 @@ TimeColumn.prototype.initiateToggleLinechartView = function(view)
 		}
 	}
 
-	tempo.toggleLinechartView(viewIndex);
+	tempo.toggleLinechartView(viewIndex, endCallback);
 }
 
 TimeColumn.prototype.toggleLinechartView = function(viewIndex, startCallback, endCallback)
 {
 	var visible = this.views[viewIndex].toggleLinechartView(startCallback, endCallback);
+	this.offsetGroups(viewIndex);
+}
 
+TimeColumn.prototype.collapse_expand = function(viewIndex, startCallback, endCallback)
+{
+	this.views[viewIndex].collapse_expand(startCallback, endCallback);
+	this.offsetGroups(viewIndex);
+}
 
-	// offset the rest of the columns
+TimeColumn.prototype.offsetGroups = function(viewIndex)
+{
 	var yOffset = 0;
-	for (var i=0; i<this.views.length; i++) 
-	{
-		if (i > viewIndex)
-		{
+	for (var i=0; i<this.views.length; i++) {
+		if (i > viewIndex) {
 			this.views[i].getGroup()
 				.transition().duration(EXPAND_DURATION)
-				.attr("transform", "translate(0," + yOffset + ")");
+				.attr('transform', 'translate(0,' + yOffset + ')');
 		}
 		yOffset += this.views[i].getH();
 	}
+}
+
+TimeColumn.prototype.getView = function(index)
+{
+	return this.views[index];
 }
 
 TimeColumn.prototype.getViews = function()

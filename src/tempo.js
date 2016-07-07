@@ -367,13 +367,38 @@ Tempo.prototype.addColumn = function()
 		{
 			var view = column.addView(varList[i], scatterHeights[i]);
 			view.setMatrixIndex([columnIndex, i]);
+
+			if (this.columns.length > 1) {
+
+				var column0 = this.columns[0].column;
+				if (column0.getView(i).isCollapsed()) 
+				{
+					view.collapse_expand(null, null, 0);
+					view.oldHeight = column0.getView(i).oldHeight;
+				}
+			}
 		}
 	}
 
 	this.renderGL();
 }
 
-Tempo.prototype.toggleLinechartView = function(viewIndex)
+Tempo.prototype.toggleCollapseExpand = function(rowIndex, endCallback)
+{
+	console.log("collapseExpandRow: " + rowIndex);
+
+	for (var i=0; i<this.columns.length; i++) {
+		this.columns[i].column.collapse_expand(
+			rowIndex,
+
+			// pass glStartAnimation, glEndAnimation for first column only
+			i == 0 ? glStartAnimation : undefined,
+			i == 0 ? function() { glEndAnimation(); if (endCallback) endCallback() }: undefined			
+		);
+	}
+}
+
+Tempo.prototype.toggleLinechartView = function(viewIndex, endCallback)
 {
 	for (var i=0; i<this.columns.length; i++) {
 		this.columns[i].column.toggleLinechartView(
@@ -381,7 +406,7 @@ Tempo.prototype.toggleLinechartView = function(viewIndex)
 
 			// pass glStartAnimation, glEndAnimation for first column only
 			i == 0 ? glStartAnimation : undefined,
-			i == 0 ? glEndAnimation: undefined
+			i == 0 ? function() { glEndAnimation(); if (endCallback) endCallback() }: undefined
 		);
 	}
 }
@@ -723,7 +748,7 @@ Tempo.prototype.renderGL = function()
 			// set time range for this view
 			view.setTimeRange( timeRange );
 
-			rangeLen[1] = view.getScatterH() - SCATTER_PAD*2
+			rangeLen[1] = view.getCurrentScatterH() - SCATTER_PAD*2
 
 			var xDomain = view.getXDomain();
 			var yDomain = view.getYDomain();
@@ -733,6 +758,11 @@ Tempo.prototype.renderGL = function()
 				xDomain[1] - xDomain[0], 
 				yDomain[1] - yDomain[0]
 			];
+
+			if (rangeLen[1] < 0) {
+				rangeMin[1] += view.getCurrentH() + SCATTER_SPACING;
+				continue;
+			}
 
 			// get framebuffer
 			/*
